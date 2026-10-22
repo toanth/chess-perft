@@ -15,24 +15,43 @@ mod perft;
 mod perft_tests;
 mod test_positions;
 
-fn read_depth_and_fen() -> Res<Option<(usize, Position)>> {
-    let mut line = String::new();
-    io::stdin().read_line(&mut line).unwrap();
-    let mut line = line.trim_ascii();
-    if line == "x" || line == "quit" {
-        return Ok(None);
+fn parse_pos(mut input: &str) -> Res<Position> {
+    input = input.strip_prefix("position ").unwrap_or(input);
+    input = input.strip_prefix("fen ").unwrap_or(input);
+    Position::from_fen(&input)
+}
+
+fn read_depth_and_fen(mut pos: Position) -> Res<Option<(usize, Position)>> {
+    let mut input = String::new();
+    let mut line;
+    loop {
+        input.clear();
+        io::stdin().read_line(&mut input).unwrap();
+        line = input.trim_ascii();
+        if line == "x" || line == "quit" {
+            return Ok(None);
+        } else if line == "uci" {
+            println!("id name chess-perft");
+            println!("id author ToTheAnd");
+            println!("uciok");
+        } else if line.starts_with("position ") {
+            pos = parse_pos(line)?;
+        } else if line == "show" || line == "debug" || line == "d" {
+            println!("{pos}");
+        } else {
+            break;
+        }
     }
     line = line.strip_prefix("go ").unwrap_or(line);
     line = line.strip_prefix("perft ").unwrap_or(line);
     line = line.strip_prefix("depth ").unwrap_or(line);
 
-    let Some((depth, mut fen)) = line.split_once(" ") else {
-        return Err(format!("Invalid input: '{}'. Expected depth and FEN", line));
+    let Some((depth, fen)) = line.split_once(" ") else {
+        let depth = line.parse::<usize>().map_err(|_| format!("Failed to parse depth '{line}'"))?;
+        return Ok(Some((depth, pos)));
     };
     let depth = depth.parse::<usize>().map_err(|_| format!("Failed to parse depth '{depth}'"))?;
-    fen = fen.strip_prefix("position ").unwrap_or(fen);
-    fen = fen.strip_prefix("fen ").unwrap_or(fen);
-    let pos = Position::from_fen(&fen)?;
+    pos = parse_pos(fen)?;
     Ok(Some((depth, pos)))
 }
 
@@ -44,7 +63,7 @@ fn main() -> Res<()> {
     }
     println!("Enter a depth and FEN, or 'x' to quit");
     loop {
-        let read = read_depth_and_fen();
+        let read = read_depth_and_fen(Position::new());
         match read {
             Err(err) => {
                 println!("{err}");

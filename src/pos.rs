@@ -62,7 +62,7 @@ impl Position {
         let mut fen = fen.split_ascii_whitespace();
         let board = fen.next().ok_or("Empty FEN")?;
         if board == "startpos" {
-            return Ok(Self::new());
+            return Self::from_fen(Self::STARTPOS);
         }
         let mut pieces = BoardPieces::default();
         let mut rank = 7;
