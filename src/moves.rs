@@ -149,6 +149,7 @@ impl Position {
         }
         self.attacks_of(src).has(m.dest)
     }
+
     pub fn make_move(mut self, m: Move) -> Self {
         debug_assert!(self.is_probably_legal(m), "{m} {self}");
         let src = m.src;

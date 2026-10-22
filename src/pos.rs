@@ -27,6 +27,7 @@ impl BoardPieces {
     pub fn place(&mut self, sq: Square, piece_type: PieceType, color: Color) {
         self.place_piece(sq, ColPiece::new(color, piece_type));
     }
+
     pub fn place_piece(&mut self, sq: Square, piece: ColPiece) {
         self.mailbox[sq] = Some(piece);
         let bb = Bitboard::single(sq);
@@ -54,6 +55,7 @@ pub struct Position {
 
 impl Position {
     pub const STARTPOS: &'static str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
     pub fn new() -> Position {
         Self::from_fen(Self::STARTPOS).unwrap()
     }

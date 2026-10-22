@@ -1,3 +1,4 @@
+use crate::moves::Move;
 use crate::perft::perft;
 use crate::pos::Position;
 use crate::test_positions::{ExpectedPerftRes, CUSTOM_FENS, INVALID, STANDARD_FENS};
@@ -7,24 +8,30 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 
 #[test]
+fn simple_test() {
+    let pos = Position::from_fen("    8/7r/8/K1k5/8/8/4p3/8 b - - 10 11").unwrap();
+    let mov = Move::parse("e2e1q", &pos).unwrap();
+    let pos = pos.make_move(mov);
+    let res = perft(pos, 5);
+    assert_eq!(res.nodes, 15010);
+}
+
+#[test]
 fn kiwipete_test() {
     let pos = Position::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1").unwrap();
     let res = perft(pos, 4);
     assert_eq!(res.nodes, 4_085_603);
-    // Disabled in debug mode because that would take too long.
-    if !cfg!(debug_assertions) {
-        // kiwipete after white castles (cheaper to run than increasing the depth of kiwipete, and failed perft once in motors)
-        let pos =
-            Position::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R4RK1 b kq - 1 1").unwrap();
-        let res = perft(pos, 4);
-        assert_eq!(res.nodes, 4_119_629);
-        // kiwipete after white plays a2a3
-        let pos =
-            Position::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/P1N2Q1p/1PPBBPPP/R3K2R b KQkq - 0 1")
-                .unwrap();
-        let res = perft(pos, 4);
-        assert_eq!(res.nodes, 4_627_439);
-    }
+    // kiwipete after white castles (cheaper to run than increasing the depth of kiwipete, and failed perft once in motors)
+    let pos =
+        Position::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R4RK1 b kq - 1 1").unwrap();
+    let res = perft(pos, 4);
+    assert_eq!(res.nodes, 4_119_629);
+    // kiwipete after white plays a2a3
+    let pos =
+        Position::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/P1N2Q1p/1PPBBPPP/R3K2R b KQkq - 0 1")
+            .unwrap();
+    let res = perft(pos, 4);
+    assert_eq!(res.nodes, 4_627_439);
 }
 
 #[test]
@@ -71,6 +78,7 @@ fn no_choice_test() {
     let res = perft(pos, 500);
     assert_eq!(res.nodes, 1);
 }
+
 
 // ** The following tests are based on tests by kz04px: <https://github.com/kz04px/rawr/blob/master/tests/perft_extra.rs> **
 
