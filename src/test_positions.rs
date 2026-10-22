@@ -12,13 +12,13 @@ impl ExpectedPerftRes {
     pub fn new(input: &'static str) -> ExpectedPerftRes {
         let mut parts = input.split(';');
         let fen = parts.next().unwrap();
-        let mut res = vec![INVALID; 8];
+        let mut res = vec![INVALID; 9];
         for r in parts {
             let mut words = r.split_whitespace();
             let depth = words.next().unwrap();
             let depth = depth.strip_prefix("D").unwrap();
             let depth = depth.parse::<usize>().unwrap();
-            assert!(depth <= 7);
+            assert!(depth <= 8);
             let node_count = words.next().unwrap();
             let node_count = node_count.parse().unwrap();
             res[depth] = node_count;
@@ -38,6 +38,12 @@ pub const CUSTOM_FENS: &[&str] = &[
     "2k5/3q4/8/8/3B4/3K1B1r/8/8 w - - 0 1 ;D1 7 ;D2 211; D3 4246 ;D4 138376 ;D5 2611571 ;D6 85530145",
     // castling through check
     "2r3kr/8/8/8/8/8/8/RK2R3 w Qk - 0 1; D1 21 ;D2 447 ;D3 9933 ;D4 226424 ;D5 5338161 ;D6 126787151",
+    // Positions from Stockfish's bench
+    "8/2p5/8/2kPKp1p/2p4P/2P5/3P4/8 w - - 0 1; D1 7; D2 34; D3 286; D4 2021; D5 18397; D6 138040; D7 1279109",
+    "7k/3p2pp/4q3/8/4Q3/5Kp1/P6b/8 w - - 0 1; D1 28; D2 770; D3 14567; D4 364175; D5 6947406",
+    // not reachable, but we support it
+    "qqqqqqqq/qQQQQQQq/qQrrrrQq/qQrNkrQq/qQbnNrQq/qQKbrrQq/qQQQQQQq/qqqqqqqq b - - 0 1; D0 1; D1 90; D2 6053; D3 455769; D4 30351197",
+    "BB1B1B1K/PPBpBpBp/PP1P1PpP/PP2b1pp/PP1p1ppp/PP4pp/PP3ppp/qq4kr b - - 99 500; D1 21; D2 46; D3 1052; D4 4478; D5 110397; D6 601429; D7 15481022; D8 121649174",
 ];
 
 pub const STANDARD_FENS: &[&str] = &[
