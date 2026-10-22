@@ -3,26 +3,21 @@ use crate::movegen::RAYS_EXCLUSIVE;
 use crate::pos::Position;
 use arrayvec::ArrayVec;
 use std::fmt::Display;
+use std::mem;
 use std::str::FromStr;
 
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
 #[repr(u8)]
 pub enum MoveFlags {
     #[default]
-    NormalQuiet,
-    DoublePawnPush,
-    CastleQueenside,
-    CastleKingside,
-    PromoKnight,
+    PromoKnight = 1,
     PromoBishop,
     PromoRook,
     PromoQueen,
-    NormalCapture,
-    EnPassant,
-    CaptPromoKnight = 12,
-    CaptPromoBishop,
-    CaptPromoRook,
-    CaptPromoQueen,
+    Normal = 8,
+    DoublePawnPush,
+    CastleQueenside,
+    CastleKingside,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -53,47 +48,25 @@ impl Move {
         self.flags() == MoveFlags::DoublePawnPush
     }
 
-    fn is_capture(self) -> bool {
-        self.flags as u8 & 0x8 != 0
-    }
-
-    pub(crate) fn is_ep(self) -> bool {
-        self.flags() == MoveFlags::EnPassant
-    }
-
-    fn is_promotion(self) -> bool {
-        self.flags as u8 & 0x4 != 0
-    }
-
-    fn promo_piece(self) -> PieceType {
-        debug_assert!(self.is_promotion(), "{self:?}");
-
-        (((self.flags as u8) & 0x3) + PieceType::Knight as u8).try_into().unwrap()
+    fn promo_piece(self) -> Option<PieceType> {
+        if (self.flags() as u8) >= MoveFlags::Normal as u8 {
+            None
+        } else {
+            unsafe {
+                Some(mem::transmute(self.flags))
+            }
+        }
     }
 
     fn is_castle(self) -> bool {
-        self.flags as u8 & 0xE == 0x2
+        self.flags as u8 >= MoveFlags::CastleQueenside as u8
     }
 
     fn flags(self) -> MoveFlags {
         self.flags
     }
-}
 
-impl Display for Move {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}{}", self.src_sq(), self.dest_sq())?;
-        if self.is_promotion() {
-            write!(f, "{}", self.promo_piece().letter())?;
-        }
-        Ok(())
-    }
-}
-
-impl FromStr for Move {
-    type Err = String;
-
-    fn from_str(s: &str) -> Res<Self> {
+    fn parse(s: &str, pos: &Position) -> Res<Self> {
         if !s.is_ascii() {
             return Err(format!("Move '{s:?}' is not ASCII"));
         }
@@ -103,18 +76,43 @@ impl FromStr for Move {
         }
         let src = Square::from_str(&s[..2])?;
         let dest = Square::from_str(&s[2..4])?;
+        let Some(piece) = pos.piece_on(src) else {
+            return Err(format!("No piece on start square {src} of move '{s}' in {pos}"));
+        };
         let flags = if len == 5 {
             match s.chars().last().unwrap() {
                 'n' => MoveFlags::PromoKnight,
                 'b' => MoveFlags::PromoBishop,
                 'r' => MoveFlags::PromoRook,
                 'q' => MoveFlags::PromoQueen,
-                x => return Err(format!("Invalid piece type '{x}'")),
+                x => return Err(format!("Invalid promotion piece type '{x}'")),
             }
+        } else if piece.piece_type() == PieceType::King {
+            if pos.piece_on(dest).is_some_and(|p| p.color() == piece.color()) || (dest.file() as usize).abs_diff(src.file() as usize) > 1 {
+                if dest.file() < src.file() {
+                    MoveFlags::CastleQueenside
+                } else {
+                    MoveFlags::CastleKingside
+                }
+            } else {
+                MoveFlags::Normal
+            }
+        } else if piece.piece_type() == PieceType::Pawn && (dest.rank() as usize).abs_diff(src.rank() as usize) > 1 {
+            MoveFlags::DoublePawnPush
         } else {
-            MoveFlags::NormalQuiet
+            MoveFlags::Normal
         };
         Ok(Move::new(src, dest, flags))
+    }
+}
+
+impl Display for Move {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}{}", self.src_sq(), self.dest_sq())?;
+        if let Some(promo) = self.promo_piece() {
+            write!(f, "{}", promo.letter())?;
+        }
+        Ok(())
     }
 }
 
@@ -126,15 +124,13 @@ pub const MAX_MOVES: usize = 271;
 pub type MoveList = ArrayVec<Move, MAX_MOVES>;
 
 impl Position {
-    pub fn is_pseudolegal(&self, m: Move) -> bool {
+    pub fn is_probably_pseudolegal(&self, m: Move) -> bool {
         let src = m.src;
         let Some(piece) = self.piece_on(src) else { return false };
         if piece.color() != self.stm {
             return false;
         }
-        if m.is_promotion() && (piece.piece_type() != PieceType::Pawn || ![0, 7].contains(&(m.dest.rank() as u8))) {
-            return false;
-        } else if m.is_ep() && self.piece_on(m.dest).is_some() {
+        if m.promo_piece().is_some() && (piece.piece_type() != PieceType::Pawn || ![0, 7].contains(&(m.dest.rank() as u8))) {
             return false;
         } else if m.is_castle() {
             let rook = if m.flags == MoveFlags::CastleQueenside {
@@ -154,7 +150,7 @@ impl Position {
         self.attacks_of(src).has(m.dest)
     }
     pub fn make_move(mut self, m: Move) -> Self {
-        debug_assert!(self.is_pseudolegal(m), "{m} {self}");
+        debug_assert!(self.is_probably_pseudolegal(m), "{m} {self}");
         let src = m.src;
         let dest = m.dest;
         let us = self.stm;
@@ -166,7 +162,7 @@ impl Position {
         if self.piece_on(dest).is_some() {
             self.pieces.remove_piece(dest);
         }
-        self.pieces.place_piece(dest, piece.piece_type(), piece.color());
+        self.pieces.place_piece(dest, piece);
         match piece.piece_type() {
             PieceType::Pawn => {
                 if m.is_double_pawn_push() {
@@ -175,10 +171,9 @@ impl Position {
                     if (bb.east() | bb.west()).intersects(self.col_piece_bb(PieceType::Pawn, !us)) {
                         self.ep = Some(((dest as u8 + src as u8) / 2).try_into().unwrap());
                     }
-                } else if m.is_promotion() {
-                    let piece_type = m.promo_piece();
+                } else if let Some(promo) = m.promo_piece() {
                     self.pieces.pieces[piece.piece_type()] ^= dest.bb();
-                    self.pieces.place_piece(dest, piece_type, piece.color());
+                    self.pieces.place(dest, promo, piece.color());
                 } else if Some(dest) == ep {
                     let captured = unsafe { dest.add(if us == Color::White { -8 } else { 8 }) };
                     self.pieces.remove_piece(captured);
@@ -194,8 +189,8 @@ impl Position {
                         _ => unreachable!(),
                     };
                     self.pieces.remove_piece(dest);
-                    self.pieces.place_piece(rook_dest, PieceType::Rook, us);
-                    self.pieces.place_piece(king_dest, PieceType::King, us);
+                    self.pieces.place(rook_dest, PieceType::Rook, us);
+                    self.pieces.place(king_dest, PieceType::King, us);
                 }
                 self.castling[us][0] = None;
                 self.castling[us][1] = None;

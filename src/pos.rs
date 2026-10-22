@@ -24,11 +24,14 @@ impl Default for BoardPieces {
 }
 
 impl BoardPieces {
-    pub fn place_piece(&mut self, sq: Square, piece: PieceType, color: Color) {
-        self.mailbox[sq] = Some(ColPiece::new(color, piece));
+    pub fn place(&mut self, sq: Square, piece_type: PieceType, color: Color) {
+        self.place_piece(sq, ColPiece::new(color, piece_type));
+    }
+    pub fn place_piece(&mut self, sq: Square, piece: ColPiece) {
+        self.mailbox[sq] = Some(piece);
         let bb = Bitboard::single(sq);
-        self.colors[color] |= bb;
-        self.pieces[piece] |= bb;
+        self.colors[piece.color()] |= bb;
+        self.pieces[piece.piece_type()] |= bb;
     }
 
     pub fn remove_piece(&mut self, sq: Square) {
@@ -79,12 +82,12 @@ impl Position {
                 let sq = Square::try_from(rank * 8 + file)?;
                 let color = if c.is_ascii_uppercase() { White } else { Black };
                 match c.to_ascii_lowercase() {
-                    'p' => pieces.place_piece(sq, Pawn, color),
-                    'n' => pieces.place_piece(sq, Knight, color),
-                    'b' => pieces.place_piece(sq, Bishop, color),
-                    'r' => pieces.place_piece(sq, Rook, color),
-                    'q' => pieces.place_piece(sq, Queen, color),
-                    'k' => pieces.place_piece(sq, King, color),
+                    'p' => pieces.place(sq, Pawn, color),
+                    'n' => pieces.place(sq, Knight, color),
+                    'b' => pieces.place(sq, Bishop, color),
+                    'r' => pieces.place(sq, Rook, color),
+                    'q' => pieces.place(sq, Queen, color),
+                    'k' => pieces.place(sq, King, color),
                     _ => return Err(format!("Invalid character '{c}' in first FEN part")),
                 }
                 file += 1;
@@ -139,6 +142,10 @@ impl Position {
 
     pub fn piece_on(&self, sq: Square) -> Option<ColPiece> {
         self.pieces.mailbox[sq]
+    }
+
+    pub fn piece_type_on(&self, sq: Square) -> Option<PieceType> {
+        self.pieces.mailbox[sq].map(|p| p.piece_type())
     }
 
     pub fn king_sq(&self, color: Color) -> Square {

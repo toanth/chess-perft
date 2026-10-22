@@ -1,7 +1,7 @@
 use crate::core::Color::{Black, White};
 use crate::core::PieceType::*;
 use crate::core::{Bitboard, Color, Rank, Square, NUM_PLAYERS, NUM_SQUARES};
-use crate::moves::MoveFlags::{CaptPromoBishop, CaptPromoKnight, CaptPromoQueen, CaptPromoRook, EnPassant, PromoBishop, PromoKnight, PromoQueen, PromoRook};
+use crate::moves::MoveFlags::{PromoBishop, PromoKnight, PromoQueen, PromoRook};
 use crate::moves::{Move, MoveFlags, MoveList};
 use crate::pos::Position;
 
@@ -269,7 +269,7 @@ impl Position {
         let (checkers, pinned) = self.calc_checkers_and_pinned(king, us);
         let relevant_attacks = self.calc_relevant_attacks_for(!us);
         for dest in KINGS[king] & !our_pieces & !relevant_attacks {
-            res.push(Move::new(king, dest, MoveFlags::NormalQuiet));
+            res.push(Move::new(king, dest, MoveFlags::Normal));
         }
         let check_ray = match checkers.0.count_ones() {
             0 => Bitboard(!0),
@@ -279,7 +279,7 @@ impl Position {
         let filter = check_ray & !our_pieces;
         for knight in self.col_piece_bb(Knight, us) & !pinned {
             for dest in KNIGHTS[knight] & filter {
-                res.push(Move::new(knight, dest, MoveFlags::NormalQuiet));
+                res.push(Move::new(knight, dest, MoveFlags::Normal));
             }
         }
         let blockers = self.occupied_bb();
@@ -316,21 +316,14 @@ impl Position {
         F: Fn(Square, Bitboard) -> Bitboard,
     {
         for src in sliders & !pinned {
-            let attacks = f(src, blockers) & filter;
-            for dest in attacks & !blockers {
-                res.push(Move::new(src, dest, MoveFlags::NormalQuiet));
-            }
-            for dest in attacks & blockers {
-                res.push(Move::new(src, dest, MoveFlags::NormalCapture));
+            for dest in f(src, blockers) & filter {
+                res.push(Move::new(src, dest, MoveFlags::Normal));
             }
         }
         for src in sliders & pinned {
             let attacks = f(src, blockers) & filter & RAYS_INFINITE[king][src];
-            for dest in attacks & !blockers {
-                res.push(Move::new(src, dest, MoveFlags::NormalQuiet));
-            }
-            for dest in attacks & blockers {
-                res.push(Move::new(src, dest, MoveFlags::NormalCapture));
+            for dest in attacks {
+                res.push(Move::new(src, dest, MoveFlags::Normal));
             }
         }
     }
@@ -359,7 +352,7 @@ impl Position {
             let pushed = push(pushable);
             for dest in pushed & quiets & !promo_rank {
                 let src = dest.add(offsets[0]);
-                res.push(Move::new(src, dest, MoveFlags::NormalQuiet));
+                res.push(Move::new(src, dest, MoveFlags::Normal));
             }
             for dest in Bitboard::rank(double_push_rank) & push(pushed & !blockers) & quiets {
                 let src = dest.add(offsets[1]);
@@ -367,11 +360,11 @@ impl Position {
             }
             for dest in captures_west & !promo_rank {
                 let src = dest.add(offsets[2]);
-                res.push(Move::new(src, dest, MoveFlags::NormalCapture));
+                res.push(Move::new(src, dest, MoveFlags::Normal));
             }
             for dest in captures_east & !promo_rank {
                 let src = dest.add(offsets[3]);
-                res.push(Move::new(src, dest, MoveFlags::NormalCapture));
+                res.push(Move::new(src, dest, MoveFlags::Normal));
             }
 
             for dest in pushed & quiets & promo_rank {
@@ -382,13 +375,13 @@ impl Position {
             }
             for dest in captures_west & promo_rank {
                 let src = dest.add(offsets[2]);
-                for p in [CaptPromoKnight, CaptPromoBishop, CaptPromoRook, CaptPromoQueen] {
+                for p in [PromoKnight, PromoBishop, PromoRook, PromoQueen] {
                     res.push(Move::new(src, dest, p));
                 }
             }
             for dest in captures_east & promo_rank {
                 let src = dest.add(offsets[3]);
-                for p in [CaptPromoKnight, CaptPromoBishop, CaptPromoRook, CaptPromoQueen] {
+                for p in [PromoKnight, PromoBishop, PromoRook, PromoQueen] {
                     res.push(Move::new(src, dest, p));
                 }
             }
@@ -411,7 +404,7 @@ impl Position {
                     }
                     for src in can_capture {
                         if !pinned.intersects(src.bb()) || RAYS_INFINITE[self.king_sq(us)][src].intersects(ep.bb()) {
-                            res.push(Move::new(src, ep, EnPassant));
+                            res.push(Move::new(src, ep, MoveFlags::Normal));
                         }
                     }
                 }
@@ -420,10 +413,10 @@ impl Position {
     }
 
     pub fn attacks_of(&self, sq: Square) -> Bitboard {
-        let piece = self.piece_on(sq).unwrap();
+        let piece = self.piece_type_on(sq).unwrap();
         let us = self.stm;
         let blockers = self.occupied_bb();
-        match piece.piece_type() {
+        match piece {
             Pawn => {
                 let single_push = sq.bb().pawn_push(us) & !self.occupied_bb();
                 let double_pushable = single_push & (Bitboard::rank(Rank::R3) | Bitboard::rank(Rank::R6));
