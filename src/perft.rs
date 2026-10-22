@@ -50,6 +50,28 @@ pub fn splitperft(pos: Position, depth: usize) -> SplitPerftRes {
     }
 }
 
+fn format_time(time: Duration) -> String {
+    let time = time.as_millis();
+    if time < 10_000 {
+        format!("{}ms", time)
+    } else if time < 60_000 {
+        format!("{:.1}s", time as f64 / 1000.)
+    } else {
+        format!("{:.1}min", time as f64 / 60_000.)
+    }
+}
+
+fn format_nps(nodes: u64, time: Duration) -> String {
+    let mut nps = nodes as f64 / time.as_secs_f64();
+    let suffix = ["", "K", "M", "B", "T", "Q"];
+    for suffix in suffix {
+        if nps < 10_000. {
+            return format!("{nps:.1}{suffix}");
+        }
+        nps /= 1_000.;
+    }
+    format!("{:.0}Q", nps * 1_000.)
+}
 
 #[derive(Copy, Clone, Debug)]
 pub struct PerftRes {
@@ -60,27 +82,11 @@ pub struct PerftRes {
 
 impl Display for PerftRes {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let time = self.time.as_millis();
-        let time = if time < 10_000 {
-            format!("{}ms", time)
-        } else if time < 60_000 {
-            format!("{:.1}s", time as f64 / 1000.)
-        } else {
-            format!("{:.1}min", time as f64 / 60_000.)
-        };
-        let mut nps = self.nodes as f64 / self.time.as_secs_f64();
-        let suffix = ["", "K", "M", "B", "T", "Q"];
-        let mut nps_string = format!("{nps:.0}");
-        for suffix in suffix {
-            if nps < 10_000. {
-                nps_string = format!("{nps:.1}{suffix}");
-                break;
-            }
-            nps /= 1_000.;
-        }
+        let time = format_time(self.time);
+        let nps = format_nps(self.nodes, self.time);
         write!(
             f,
-            "Finished perft depth {depth} in {time} ({nps_string}nps)\nNodes searched: {nodes}",
+            "Finished perft depth {depth} in {time} ({nps}nps)\nNodes: {nodes}",
             depth = self.depth,
             nodes = self.nodes,
         )
@@ -98,13 +104,14 @@ impl Display for SplitPerftRes {
         for child in &self.children {
             writeln!(f, "{0}\t{1}", child.0, child.1)?;
         }
+        let nodes = self.perft_res.nodes;
+        let time = self.perft_res.time;
+        let nps = format_nps(nodes, time);
+        let time = format_time(time);
         write!(
             f,
-            "info depth {depth} nodes {nodes} time {time} nps {nps} children {children}",
+            "Finished splitperft depth {depth} in {time} ({nps}nps) with {children} children\nNodes: {nodes}",
             depth = self.perft_res.depth,
-            nodes = self.perft_res.nodes,
-            time = self.perft_res.time.as_millis(),
-            nps = self.perft_res.nodes * 1_000_000 / self.perft_res.time.as_micros().max(1) as u64,
             children = self.children.len(),
         )?;
         Ok(())

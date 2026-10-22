@@ -26,6 +26,7 @@ impl ExpectedPerftRes {
         ExpectedPerftRes { fen, res }
     }
 }
+
 #[allow(dead_code)]
 pub const CUSTOM_FENS: &[&str] = &[
     // tricky to parse X-FENs

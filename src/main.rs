@@ -1,8 +1,9 @@
 use crate::core::Res;
 use crate::moves::Move;
-use crate::perft::{perft_impl, splitperft};
+use crate::perft::{perft_impl, splitperft, PerftRes};
 use crate::pos::Position;
 use crate::test_positions::{ExpectedPerftRes, STANDARD_FENS};
+use std::cmp::min;
 use std::env::args;
 use std::io;
 use std::time::Instant;
@@ -94,11 +95,20 @@ fn benchmark() {
     const MAX_NODES: u64 = 10_000_000;
     let expected = STANDARD_FENS.iter().map(|&f| ExpectedPerftRes::new(f)).collect::<Vec<_>>();
     let start = Instant::now();
+    let mut nodes = 0;
+    let mut min_depth = usize::MAX;
     for (i, r) in expected.iter().enumerate() {
         let depth = r.res.iter().rposition(|&n| n <= MAX_NODES).unwrap();
         let perft_res = perft_impl(Position::from_fen(r.fen).unwrap(), depth);
+        nodes += perft_res;
+        min_depth = min(min_depth, depth);
         assert_eq!(r.res[depth], perft_res, "position {i}, depth {depth}, FEN '{}'", r.fen);
     }
-    let end = start.elapsed();
-    println!("Finished in {}ms", end.as_millis());
+    let time = start.elapsed();
+    let res = PerftRes {
+        time,
+        nodes,
+        depth: min_depth,
+    };
+    println!("{res}");
 }
