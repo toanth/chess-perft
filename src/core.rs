@@ -68,6 +68,12 @@ pub enum Color {
     Black,
 }
 
+impl Color {
+    pub fn iter() -> impl Iterator<Item=Self> {
+        [Self::White, Self::Black].into_iter()
+    }
+}
+
 impl Not for Color {
     type Output = Self;
     fn not(self) -> Self::Output {
@@ -339,6 +345,7 @@ impl Bitboard {
     pub const H_FILE: Self = Self(0x8080_8080_8080_8080);
     pub const RANK_1: Self = Self(0xFF);
     pub const RANK_8: Self = Self(0xFF00_0000_0000_0000);
+    pub const BACKRANKS: Self = Self(Self::RANK_1.0 | Self::RANK_8.0);
 
     pub const fn single(sq: Square) -> Self {
         Self(1 << sq as usize)
@@ -371,6 +378,11 @@ impl Bitboard {
             Color::Black => self.south(),
         }
     }
+
+    pub fn count_ones(self) -> usize {
+        self.0.count_ones() as usize
+    }
+
     pub fn swap_bytes(self) -> Self {
         Self(self.0.swap_bytes())
     }
@@ -390,7 +402,7 @@ impl Bitboard {
     }
 
     pub fn sq(self) -> Square {
-        debug_assert!(self.0.count_ones() == 1);
+        debug_assert!(self.count_ones() == 1);
         (self.0.trailing_zeros() as u8).try_into().unwrap()
     }
 }

@@ -5,8 +5,8 @@ use std::fmt::Display;
 use std::time::{Duration, Instant};
 
 pub fn perft_impl(pos: Position, depth: usize) -> u64 {
-    if depth == 0 {
-        return 1;
+    if depth == 1 {
+        return pos.num_moves() as u64;
     }
     let mut res = 0;
     for m in pos.legal_moves() {
@@ -19,7 +19,9 @@ pub fn perft_impl(pos: Position, depth: usize) -> u64 {
 #[allow(dead_code)]
 pub fn perft(pos: Position, depth: usize) -> PerftRes {
     let start = Instant::now();
-    let nodes = perft_impl(pos, depth);
+    let nodes = if depth == 0 {
+        1
+    } else { perft_impl(pos, depth) };
     PerftRes {
         time: start.elapsed(),
         nodes,
@@ -33,8 +35,12 @@ pub fn splitperft(pos: Position, depth: usize) -> SplitPerftRes {
     let mut nodes = 0;
     let start = Instant::now();
     for m in pos.legal_moves() {
-        let child = pos.make_move(m);
-        let child_nodes = perft_impl(child, depth - 1);
+        let child_nodes = if depth == 1 {
+            1
+        } else {
+            let child = pos.make_move(m);
+            perft_impl(child, depth - 1)
+        };
         nodes += child_nodes;
         children.push((m, child_nodes));
     }

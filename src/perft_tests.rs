@@ -1,7 +1,7 @@
 use crate::moves::Move;
 use crate::perft::perft;
 use crate::pos::Position;
-use crate::test_positions::{ExpectedPerftRes, CUSTOM_FENS, INVALID, STANDARD_FENS};
+use crate::test_positions::{ExpectedPerftRes, CHESS_960_FENS, CUSTOM_FENS, INVALID, STANDARD_FENS};
 use rayon::prelude::*;
 use std::io::{stdout, Write};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -236,11 +236,11 @@ fn standard_perft_test() {
     perft_test(STANDARD_FENS);
 }
 
-// #[test]
-// #[ignore]
-// fn chess960_perft_test() {
-//     perft_test(&CHESS_960_FENS);
-// }
+#[test]
+#[ignore]
+fn chess960_perft_test() {
+    perft_test(&CHESS_960_FENS);
+}
 
 #[test]
 #[ignore]

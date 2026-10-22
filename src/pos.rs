@@ -3,6 +3,7 @@ use crate::core::Color::*;
 use crate::core::PieceType::*;
 use crate::core::{Bitboard, ColPiece, Color, File, PieceType, Square, NUM_PIECES, NUM_PLAYERS};
 use crate::core::{Rank, Res};
+use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -128,9 +129,6 @@ impl Position {
                         let file = File::try_from(f)?;
                         let side = (file > king.file()) as usize;
                         let sq = Square::from_rank_file(rank, file);
-                        if pieces.mailbox[sq] != Some(rook) {
-                            return Err(format!("There is no {color} rook on {sq} to castle with"));
-                        }
                         castling[color][side] = Some(sq);
                     }
                     _ => return Err(format!("Invalid castling right '{c}' in FEN")),
@@ -139,7 +137,57 @@ impl Position {
         }
         let ep_str = fen.next().ok_or("Missing ep part in FEN")?;
         let ep = if ep_str == "-" { None } else { Some(ep_str.parse()?) };
-        Ok(Self { pieces, castling, ep, stm })
+        let res = Self { pieces, castling, ep, stm };
+        res.check_valid()
+    }
+
+    pub fn check_valid(self) -> Res<Self> {
+        if self.pieces.colors[0] & self.pieces.colors[1] != Bitboard(0) {
+            return Err("Color bitboards overlap".into());
+        }
+        let mut acc = Bitboard(0);
+        for bb in self.pieces.pieces {
+            if bb.intersects(acc) {
+                return Err("Piece bitboards overlap".into());
+            }
+            acc |= bb;
+        }
+        if acc != self.occupied_bb() {
+            return Err("Piece bitboards and color bitboards differ".into());
+        }
+        let mut num_pieces = 0;
+        for (i, piece) in self.pieces.mailbox.iter().enumerate() {
+            let sq = Square::try_from(i as u8).unwrap();
+            let Some(piece) = piece else {
+                if self.occupied_bb().has(sq) {
+                    return Err("Bitboards and mailbox differ".into());
+                }
+                continue;
+            };
+            num_pieces += 1;
+            if !self.pieces.colors[piece.color()].has(sq) || !self.pieces.pieces[piece.piece_type()].has(sq) {
+                return Err("Bitboards and mailbox differ".into());
+            }
+        }
+        if num_pieces != self.occupied_bb().0.count_ones() {
+            return Err("Bitboards and mailbox differ".into());
+        }
+        if self.pieces.pieces[Pawn].intersects(Bitboard::BACKRANKS) {
+            return Err("There is a pawn on a backrank".into());
+        }
+        for c in Color::iter() {
+            for (i, &side) in self.castling[c].iter().enumerate() {
+                if let Some(sq) = side {
+                    if self.piece_on(sq) != Some(ColPiece::new(c, Rook)) || sq.rank() != Rank::try_from(7 * c as usize).unwrap() || sq.file().cmp(&self.king_sq(c).file()) != if i == 0 { Ordering::Less } else { Ordering::Greater } {
+                        return Err("Incorrect castling flag".into());
+                    }
+                }
+            }
+        }
+        if self.calc_checkers_and_pinned(self.king_sq(!self.stm), !self.stm).0 != Bitboard(0) {
+            return Err("The inactive player is in check".into());
+        }
+        Ok(self)
     }
 
     pub fn piece_on(&self, sq: Square) -> Option<ColPiece> {

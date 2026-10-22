@@ -1,0 +1,3 @@
+cache attacks per square: For each square, store a bitboard of the squares the piece on this square attacks.
+Keep a bitboard `valid` of up-to-date cached squares. When a piece moves, the attacks of the from and to square get invalidated,
+which might require attack tables to update the src square (but not the dest square)
