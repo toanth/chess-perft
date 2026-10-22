@@ -66,7 +66,7 @@ impl Move {
         self.flags
     }
 
-    fn parse(s: &str, pos: &Position) -> Res<Self> {
+    pub fn parse(s: &str, pos: &Position) -> Res<Self> {
         if !s.is_ascii() {
             return Err(format!("Move '{s:?}' is not ASCII"));
         }
@@ -124,7 +124,7 @@ pub const MAX_MOVES: usize = 271;
 pub type MoveList = ArrayVec<Move, MAX_MOVES>;
 
 impl Position {
-    pub fn is_probably_pseudolegal(&self, m: Move) -> bool {
+    pub fn is_probably_legal(&self, m: Move) -> bool {
         let src = m.src;
         let Some(piece) = self.piece_on(src) else { return false };
         if piece.color() != self.stm {
@@ -150,7 +150,7 @@ impl Position {
         self.attacks_of(src).has(m.dest)
     }
     pub fn make_move(mut self, m: Move) -> Self {
-        debug_assert!(self.is_probably_pseudolegal(m), "{m} {self}");
+        debug_assert!(self.is_probably_legal(m), "{m} {self}");
         let src = m.src;
         let dest = m.dest;
         let us = self.stm;

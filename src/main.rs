@@ -1,4 +1,5 @@
 use crate::core::Res;
+use crate::moves::Move;
 use crate::perft::{perft_impl, splitperft};
 use crate::pos::Position;
 use crate::test_positions::{ExpectedPerftRes, STANDARD_FENS};
@@ -18,7 +19,18 @@ mod test_positions;
 fn parse_pos(mut input: &str) -> Res<Position> {
     input = input.strip_prefix("position ").unwrap_or(input);
     input = input.strip_prefix("fen ").unwrap_or(input);
-    Position::from_fen(&input)
+    let Some((fen, moves)) = input.split_once(" moves ") else {
+        return Position::from_fen(&input);
+    };
+    let mut pos = Position::from_fen(&fen)?;
+    for m in moves.split_ascii_whitespace() {
+        let m = Move::parse(m, &pos)?;
+        if !pos.is_probably_legal(m) {
+            return Err(format!("Move '{m}' is not legal in {pos}"));
+        }
+        pos = pos.make_move(m);
+    }
+    Ok(pos)
 }
 
 fn read_depth_and_fen(mut pos: Position) -> Res<Option<(usize, Position)>> {
