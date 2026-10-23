@@ -64,8 +64,8 @@ fn castling_perft_test() {
         #[cfg(not(debug_assertions))]
         53117779,
     ];
-    for (depth, perft_num) in expected.iter().enumerate() {
-        assert_eq!(perft(pos, depth + 1).nodes, *perft_num);
+    for (depth, &perft_num) in expected.iter().enumerate() {
+        assert_eq!(perft(pos, depth + 1).nodes, perft_num);
     }
 }
 

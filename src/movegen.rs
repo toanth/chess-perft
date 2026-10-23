@@ -1,8 +1,6 @@
 use crate::core::Color::{Black, White};
-#[cfg(all(feature = "pext-lookup", target_feature = "bmi2"))]
-use crate::core::File;
 use crate::core::PieceType::*;
-use crate::core::{Bitboard, Color, Rank, Square, NUM_PLAYERS, NUM_SQUARES};
+use crate::core::{Bitboard, Color, File, Rank, Square, NUM_PLAYERS, NUM_SQUARES};
 use crate::moves::MoveFlags::{PromoBishop, PromoKnight, PromoQueen, PromoRook};
 use crate::moves::{Move, MoveFlags, MoveList};
 use crate::pos::Position;
@@ -389,6 +387,58 @@ pub static RAYS_INFINITE: [[Bitboard; 64]; 64] = {
     res
 };
 
+// TODO: Manual AVX2 impl?
+pub fn kogge_stone<const DIR: usize>(
+    sliders: Bitboard,
+    empty: Bitboard,
+    fwd_filter: Bitboard,
+    bwd_filter: Bitboard,
+) -> Bitboard {
+    let mut forward = sliders;
+    let mut fwd_allowed = empty & fwd_filter;
+    let mut backward = sliders;
+    let mut bwd_allowed = empty & bwd_filter;
+    forward |= fwd_allowed & (forward << DIR);
+    backward |= bwd_allowed & (backward >> DIR);
+    fwd_allowed &= fwd_allowed << DIR;
+    bwd_allowed &= bwd_allowed >> DIR;
+    forward |= fwd_allowed & (forward << 2 * DIR);
+    backward |= bwd_allowed & (backward >> 2 * DIR);
+    fwd_allowed &= fwd_allowed << 2 * DIR;
+    bwd_allowed &= bwd_allowed >> 2 * DIR;
+    forward |= fwd_allowed & (forward << 4 * DIR);
+    backward |= bwd_allowed & (backward >> 4 * DIR);
+    ((forward << DIR) & fwd_filter) | ((backward >> DIR) & bwd_filter)
+}
+
+pub fn all_knight_attacks(knights: Bitboard) -> Bitboard {
+    let masks = [
+        !Bitboard::A_FILE,
+        !(Bitboard::A_FILE | Bitboard::file(File::B)),
+        !Bitboard::file(File::H),
+        !(Bitboard::file(File::G) | Bitboard::file(File::H)),
+    ];
+    let up = ((knights & masks[0]) << 2 * 8 - 1) | ((knights & masks[1]) << 8 - 2) | ((knights & masks[2]) << 2 * 8 + 1) | ((knights & masks[3]) << 8 + 2);
+    let down = ((knights & masks[0]) >> 2 * 8 + 1) | ((knights & masks[1]) >> 8 + 2) | ((knights & masks[2]) >> 2 * 8 - 1) | ((knights & masks[3]) >> 8 - 2);
+    up | down
+}
+
+pub fn all_rook_attacks(sliders: Bitboard, blockers: Bitboard) -> Bitboard {
+    let all = Bitboard(!0);
+    let vertical = kogge_stone::<8>(sliders, !blockers, all, all);
+    let horizontal = kogge_stone::<1>(sliders, !blockers, !Bitboard::A_FILE, !Bitboard::file(File::H));
+    horizontal | vertical
+}
+
+pub fn all_bishop_attacks(sliders: Bitboard, blockers: Bitboard) -> Bitboard {
+    let not_a_file = !Bitboard::A_FILE;
+    let not_h_file = !Bitboard::file(File::H);
+    let diagonal = kogge_stone::<9>(sliders, !blockers, not_a_file, not_h_file);
+    let anti_diagonal = kogge_stone::<7>(sliders, !blockers, not_h_file, not_a_file);
+    diagonal | anti_diagonal
+}
+
+
 pub trait MoveGenCallback {
     fn gen_attacks(&mut self, bb: Bitboard, src: Square, flag: MoveFlags);
     fn gen_single(&mut self, src: Square, dest: Square, flag: MoveFlags);
@@ -616,21 +666,12 @@ impl Position {
     pub fn calc_relevant_attacks_for(&self, us: Color) -> Bitboard {
         let mut res = KINGS[self.king_sq(us)];
         res |= Self::pawn_attacks(self.col_piece_bb(Pawn, us), us);
-        for knight in self.col_piece_bb(Knight, us) {
-            res |= KNIGHTS[knight];
-        }
-        // TODO: Setwise slider attacks
-        // TODO: Mask pieces that can't influence move legality
+        res |= all_knight_attacks(self.col_piece_bb(Knight, us));
         let blockers = self.occupied_bb() ^ self.col_piece_bb(King, !us);
-        for bishop in self.col_piece_bb(Bishop, us) {
-            res |= bishop_attacks(bishop, blockers);
-        }
-        for rook in self.col_piece_bb(Rook, us) {
-            res |= rook_attacks(rook, blockers);
-        }
-        for queen in self.col_piece_bb(Queen, us) {
-            res |= queen_attacks(queen, blockers);
-        }
+        let bishop_sliders = (self.piece_bb(Bishop) | self.piece_bb(Queen)) & self.col_bb(us);
+        res |= all_bishop_attacks(bishop_sliders, blockers);
+        let rook_sliders = (self.piece_bb(Rook) | self.piece_bb(Queen)) & self.col_bb(us);
+        res |= all_rook_attacks(rook_sliders, blockers);
         res
     }
 
