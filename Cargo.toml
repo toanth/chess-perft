@@ -7,3 +7,7 @@ edition = "2024"
 derive_more = { version = "2.1.1", features = ["add", "add_assign", "mul", "mul_assign", "not"] }
 arrayvec = "0.7.8" # TODO: Remove once we no longer need a move list
 rayon = "1.12.0"
+
+[profile.release]
+panic = "abort"
+lto = true
