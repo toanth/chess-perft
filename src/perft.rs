@@ -1,3 +1,4 @@
+use crate::movegen::MoveListCallback;
 use crate::moves::Move;
 use crate::pos::Position;
 use std::fmt;
@@ -9,10 +10,11 @@ pub fn perft_impl(pos: Position, depth: usize) -> u64 {
         return pos.num_moves() as u64;
     }
     let mut res = 0;
-    for m in pos.legal_moves() {
-        let child = pos.make_move(m);
-        res += perft_impl(child, depth - 1);
-    }
+    let f = |m: Move| {
+        let new_pos = pos.make_move(m);
+        res += perft_impl(new_pos, depth - 1);
+    };
+    pos.legal_moves_impl(MoveListCallback { f });
     res
 }
 

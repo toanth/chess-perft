@@ -273,26 +273,25 @@ pub trait MoveGenCallback {
     }
 }
 
-// TODO: Remove? MoveLists shouldn't be necessary
-struct MoveListCallback<'a> {
-    list: &'a mut MoveList,
+pub struct MoveListCallback<F: FnMut(Move)> {
+    pub f: F,
 }
 
-impl MoveGenCallback for MoveListCallback<'_> {
+impl<F: FnMut(Move)> MoveGenCallback for MoveListCallback<F> {
     fn gen_attacks(&mut self, bb: Bitboard, src: Square, flag: MoveFlags) {
         for dest in bb {
-            self.list.push(Move::new(src, dest, flag))
+            (self.f)(Move::new(src, dest, flag))
         }
     }
 
     fn gen_single(&mut self, src: Square, dest: Square, flag: MoveFlags) {
-        self.list.push(Move::new(src, dest, flag))
+        (self.f)(Move::new(src, dest, flag))
     }
 
     unsafe fn gen_pawns(&mut self, dests: Bitboard, offset: i8, flag: MoveFlags) {
         for dest in dests {
             let src = unsafe { dest.add(offset) };
-            self.list.push(Move::new(src, dest, flag));
+            (self.f)(Move::new(src, dest, flag));
         }
     }
 }
@@ -318,7 +317,8 @@ impl MoveGenCallback for CountMovesCallback<'_> {
 impl Position {
     pub fn legal_moves(&self) -> MoveList {
         let mut res = MoveList::new();
-        let callback = MoveListCallback { list: &mut res };
+        let f = |m: Move| res.push(m);
+        let callback = MoveListCallback { f };
         self.legal_moves_impl(callback);
         res
     }
