@@ -78,8 +78,9 @@ fn main() -> Res<()> {
         return Ok(());
     }
     println!("Enter a depth and FEN, or 'x' to quit");
+    let mut old_pos = Position::new();
     loop {
-        let read = read_depth_and_fen(Position::new());
+        let read = read_depth_and_fen(old_pos);
         match read {
             Err(err) => {
                 println!("{err}");
@@ -87,6 +88,7 @@ fn main() -> Res<()> {
             }
             Ok(None) => return Ok(()),
             Ok(Some((depth, pos))) => {
+                old_pos = pos;
                 let perft_res = splitperft(pos, depth);
                 println!("{perft_res}");
             }
