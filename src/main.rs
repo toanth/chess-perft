@@ -36,14 +36,10 @@ fn parse_pos(mut input: &str) -> Res<Position> {
     Ok(pos)
 }
 
-fn read_depth_and_fen(mut pos: Position) -> Res<Option<(usize, Position)>> {
-    movegen::force_init();
-    let mut input = String::new();
-    let mut line;
+
+fn handle_input(mut line: &str, pos: &mut Position) -> Res<Option<usize>> {
+    line = line.trim();
     loop {
-        input.clear();
-        io::stdin().read_line(&mut input).unwrap();
-        line = input.trim_ascii();
         if line == "x" || line == "quit" {
             return Ok(None);
         } else if line == "uci" {
@@ -51,7 +47,7 @@ fn read_depth_and_fen(mut pos: Position) -> Res<Option<(usize, Position)>> {
             println!("id author ToTheAnd");
             println!("uciok");
         } else if line.starts_with("position ") {
-            pos = parse_pos(line)?;
+            *pos = parse_pos(line)?;
         } else if line == "show" || line == "debug" || line == "d" {
             println!("{pos}");
         } else {
@@ -64,36 +60,42 @@ fn read_depth_and_fen(mut pos: Position) -> Res<Option<(usize, Position)>> {
 
     let Some((depth, fen)) = line.split_once(" ") else {
         let depth = line.parse::<usize>().map_err(|_| format!("Failed to parse depth '{line}'"))?;
-        return Ok(Some((depth, pos)));
+        return Ok(Some(depth));
     };
     let depth = depth.parse::<usize>().map_err(|_| format!("Failed to parse depth '{depth}'"))?;
-    pos = parse_pos(fen)?;
-    Ok(Some((depth, pos)))
+    *pos = parse_pos(fen)?;
+    Ok(Some(depth))
 }
 
-fn main() -> Res<()> {
-    let args = args().collect::<Vec<String>>();
-    if args.iter().find(|&x| x == "--benchmark" || x == "-b").is_some() {
-        benchmark();
-        return Ok(());
-    }
-    println!("Enter a depth and FEN, or 'x' to quit");
-    let mut old_pos = Position::new();
-    loop {
-        let read = read_depth_and_fen(old_pos);
-        match read {
+fn run(pos: &mut Position, lines: impl Iterator<Item=String>) -> Option<()> {
+    for line in lines {
+        if line == "--benchmark" || line == "-b" {
+            benchmark();
+            return None;
+        }
+        match handle_input(&line, pos) {
             Err(err) => {
                 println!("{err}");
                 continue;
             }
-            Ok(None) => return Ok(()),
-            Ok(Some((depth, pos))) => {
-                old_pos = pos;
-                let perft_res = splitperft(pos, depth);
+            Ok(None) => return None,
+            Ok(Some(depth)) => {
+                let perft_res = splitperft(*pos, depth);
                 println!("{perft_res}");
             }
         };
     }
+    Some(())
+}
+
+fn main() {
+    movegen::force_init();
+    let mut pos = Position::new();
+    let Some(()) = run(&mut pos, args().skip(1))  else {
+        return;
+    };
+    println!("Enter a depth and FEN, or 'x' to quit");
+    _ = run(&mut pos, io::stdin().lines().map(|l| l.unwrap()));
 }
 
 fn benchmark() {
@@ -130,5 +132,5 @@ fn benchmark() {
     let l = nps[1];
     let h = nps[n - 1];
     println!("{res}");
-    println!("avg {avg:.1}, median {median:.1}, 5th/95th percentile [{a:.1}, {b:.1}], span[{l:.1}, {h:.1}]");
+    println!("Mnps: avg {avg:.1}, median {median:.1}, 5th/95th percentile [{a:.1}, {b:.1}], span[{l:.1}, {h:.1}]");
 }
