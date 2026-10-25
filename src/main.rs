@@ -97,15 +97,19 @@ fn main() -> Res<()> {
 }
 
 fn benchmark() {
-    const MAX_NODES: u64 = 100_000_000;
+    const MAX_NODES: u64 = 50_000_000;
     let expected = STANDARD_FENS.iter().map(|&f| ExpectedPerftRes::new(f)).collect::<Vec<_>>();
+    let mut nps = Vec::with_capacity(expected.len());
     let start = Instant::now();
     let mut nodes = 0;
     let mut min_depth = usize::MAX;
     for (i, r) in expected.iter().enumerate() {
         let depth = r.res.iter().rposition(|&n| n <= MAX_NODES).unwrap();
+        let before = Instant::now();
         let perft_res = perft_impl(Position::from_fen(r.fen).unwrap(), depth);
         nodes += perft_res;
+        let elapsed = before.elapsed().as_secs_f64();
+        nps.push((perft_res as f64 / elapsed / 1_000_000., r.fen));
         min_depth = min(min_depth, depth);
         assert_eq!(r.res[depth], perft_res, "position {i}, depth {depth}, FEN '{}'", r.fen);
     }
@@ -115,5 +119,16 @@ fn benchmark() {
         nodes,
         depth: min_depth,
     };
+    nps.sort_by(|(a_nps, _), (b_nps, _)| f64::total_cmp(a_nps, b_nps));
+    let _fens = nps.iter().map(|(_, fen)| *fen).collect::<Vec<_>>();
+    let n = nps.len();
+    let nps = nps.iter().map(|(nps, _)| *nps).collect::<Vec<_>>();
+    let avg = nps.iter().sum::<f64>() / n as f64;
+    let median = nps[n / 2];
+    let a = nps[n / 20];
+    let b = nps[n * 19 / 20];
+    let l = nps[1];
+    let h = nps[n - 1];
     println!("{res}");
+    println!("avg {avg:.1}, median {median:.1}, 5th/95th percentile [{a:.1}, {b:.1}], span[{l:.1}, {h:.1}]");
 }
