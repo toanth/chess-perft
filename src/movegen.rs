@@ -118,6 +118,7 @@ pub const RELEVANT_BISHOPS: [Bitboard; NUM_SQUARES] = {
 #[cfg(all(feature = "pext-lookup", target_feature = "bmi2"))]
 const RELEVANT_COMBINATIONS: usize = 1 << 12;
 
+#[cfg(all(feature = "pext-lookup", target_feature = "bmi2"))]
 type SliderGen = fn(Square, Bitboard) -> Bitboard;
 
 #[cfg(all(feature = "pext-lookup", target_feature = "bmi2"))]

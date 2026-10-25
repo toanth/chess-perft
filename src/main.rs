@@ -95,7 +95,7 @@ fn main() -> Res<()> {
 }
 
 fn benchmark() {
-    const MAX_NODES: u64 = 500_000_000;
+    const MAX_NODES: u64 = 100_000_000;
     let expected = STANDARD_FENS.iter().map(|&f| ExpectedPerftRes::new(f)).collect::<Vec<_>>();
     let start = Instant::now();
     let mut nodes = 0;
