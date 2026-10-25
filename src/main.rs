@@ -1,3 +1,5 @@
+#![feature(alloc_slice_into_array)]
+
 use crate::core::Res;
 use crate::moves::Move;
 use crate::perft::{perft_impl, splitperft, PerftRes};
@@ -35,6 +37,7 @@ fn parse_pos(mut input: &str) -> Res<Position> {
 }
 
 fn read_depth_and_fen(mut pos: Position) -> Res<Option<(usize, Position)>> {
+    movegen::force_init();
     let mut input = String::new();
     let mut line;
     loop {

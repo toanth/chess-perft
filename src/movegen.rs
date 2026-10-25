@@ -1,9 +1,13 @@
 use crate::core::Color::{Black, White};
+#[cfg(all(feature = "pext-lookup", target_feature = "bmi2"))]
+use crate::core::File;
 use crate::core::PieceType::*;
 use crate::core::{Bitboard, Color, Rank, Square, NUM_PLAYERS, NUM_SQUARES};
 use crate::moves::MoveFlags::{PromoBishop, PromoKnight, PromoQueen, PromoRook};
 use crate::moves::{Move, MoveFlags, MoveList};
 use crate::pos::Position;
+#[cfg(all(feature = "pext-lookup", target_feature = "bmi2"))]
+use std::sync::LazyLock;
 
 pub const PAWN_CAPTS: [[Bitboard; NUM_SQUARES]; NUM_PLAYERS] = {
     let mut res = [[Bitboard(0); NUM_SQUARES]; NUM_PLAYERS];
@@ -55,6 +59,7 @@ pub const KNIGHTS: [Bitboard; NUM_SQUARES] = {
     knights
 };
 
+// Attacks of a rook on an empty board, without the rook's square itself
 pub const ROOKS: [Bitboard; NUM_SQUARES] = {
     let mut rooks = [Bitboard(0); NUM_SQUARES];
     let mut i = 0;
@@ -65,6 +70,7 @@ pub const ROOKS: [Bitboard; NUM_SQUARES] = {
     rooks
 };
 
+// Attacks of a bishop on an empty board, without the bishop's square itself
 pub const BISHOPS: [Bitboard; NUM_SQUARES] = {
     let mut bishops = [Bitboard(0); NUM_SQUARES];
     let mut i = 0;
@@ -75,13 +81,136 @@ pub const BISHOPS: [Bitboard; NUM_SQUARES] = {
     bishops
 };
 
+#[cfg(all(feature = "pext-lookup", target_feature = "bmi2"))]
+pub const RELEVANT_ROOKS: [Bitboard; NUM_SQUARES] = {
+    let mut res = [Bitboard(0); NUM_SQUARES];
+    let mut i = 0;
+    while i < NUM_SQUARES {
+        res[i] = ROOKS[i];
+        let rank = Square::new(i).rank() as usize;
+        if rank != Rank::R1 as usize {
+            res[i].0 &= !Bitboard::RANK_1.0;
+        }
+        if rank != Rank::R8 as usize {
+            res[i].0 &= !Bitboard::RANK_8.0;
+        }
+        let file = Square::new(i).file() as usize;
+        if file != File::A as usize {
+            res[i].0 &= !Bitboard::A_FILE.0;
+        }
+        if file != File::H as usize {
+            res[i].0 &= !Bitboard::H_FILE.0;
+        }
+        i += 1;
+    }
+    res
+};
 
-pub fn rook_attacks(square: Square, blockers: Bitboard) -> Bitboard {
+#[cfg(all(feature = "pext-lookup", target_feature = "bmi2"))]
+pub const RELEVANT_BISHOPS: [Bitboard; NUM_SQUARES] = {
+    let mut res = [Bitboard(0); NUM_SQUARES];
+    let mut i = 0;
+    while i < NUM_SQUARES {
+        res[i].0 = BISHOPS[i].0 & !Bitboard::EDGES.0;
+        i += 1;
+    }
+    res
+};
+
+#[cfg(all(feature = "pext-lookup", target_feature = "bmi2"))]
+const RELEVANT_COMBINATIONS: usize = 1 << 12;
+
+type SliderGen = fn(Square, Bitboard) -> Bitboard;
+
+#[cfg(all(feature = "pext-lookup", target_feature = "bmi2"))]
+fn calc_slider_table(slider_gen: SliderGen, relevant: &[Bitboard; NUM_SQUARES]) -> Box<[[Bitboard; RELEVANT_COMBINATIONS]; NUM_SQUARES]> {
+    let mut sliders = vec![[Bitboard(0); RELEVANT_COMBINATIONS]; NUM_SQUARES];
+    for sq in Square::iter() {
+        debug_assert!(!relevant[sq].has(sq));
+        let relevant = relevant[sq];
+        assert_ne!(relevant, Bitboard(0));
+        let mut comb = Bitboard(0);
+        loop {
+            comb.0 = comb.0.wrapping_sub(relevant.0) & relevant.0;
+            let res = slider_gen(sq, comb);
+            assert_ne!(res, Bitboard(0));
+            assert!(!res.has(sq));
+            let index = pext(comb, relevant);
+            sliders[sq as usize][index.0 as usize] = res;
+            if comb == Bitboard(0) {
+                break;
+            }
+        }
+    }
+    sliders.into_array().unwrap()
+}
+
+#[cfg(all(feature = "pext-lookup", target_feature = "bmi2"))]
+fn calc_rooks() -> Box<[[Bitboard; RELEVANT_COMBINATIONS]; NUM_SQUARES]> {
+    calc_slider_table(rook_attacks_hq, &RELEVANT_ROOKS)
+}
+
+#[cfg(all(feature = "pext-lookup", target_feature = "bmi2"))]
+fn calc_bishops() -> Box<[[Bitboard; RELEVANT_COMBINATIONS]; NUM_SQUARES]> {
+    calc_slider_table(bishop_attacks_hq, &RELEVANT_BISHOPS)
+}
+
+// There is the unstable .extract_bits function, but at the time of writing this *never* emits `pext`
+// even on targets where pext is known to exist and be fast, which makes it essentially useless.
+#[cfg(all(feature = "pext-lookup", target_feature = "bmi2"))]
+fn pext(bb: Bitboard, mask: Bitboard) -> Bitboard {
+    unsafe {
+        Bitboard(std::arch::x86_64::_pext_u64(bb.0, mask.0))
+    }
+}
+
+#[cfg(all(feature = "pext-lookup", target_feature = "bmi2"))]
+static ROOK_LOOKUP: LazyLock<Box<[[Bitboard; RELEVANT_COMBINATIONS]; NUM_SQUARES]>> = LazyLock::new(|| calc_rooks());
+
+#[cfg(all(feature = "pext-lookup", target_feature = "bmi2"))]
+static BISHOP_LOOKUP: LazyLock<Box<[[Bitboard; RELEVANT_COMBINATIONS]; NUM_SQUARES]>> = LazyLock::new(|| calc_bishops());
+
+pub fn force_init() {
+    #[cfg(all(feature = "pext-lookup", target_feature = "bmi2"))]
+    {
+        LazyLock::force(&ROOK_LOOKUP);
+        LazyLock::force(&BISHOP_LOOKUP);
+    }
+}
+
+pub fn rook_attacks_hq(square: Square, blockers: Bitboard) -> Bitboard {
     hq(square, blockers, Bitboard::file(square.file()) ^ square.bb()) | horizontal_attacks(square, blockers)
 }
 
-pub fn bishop_attacks(square: Square, blockers: Bitboard) -> Bitboard {
+pub fn bishop_attacks_hq(square: Square, blockers: Bitboard) -> Bitboard {
     hq(square, blockers, DIAGONALS[square]) | hq(square, blockers, ANTI_DIAGONALS[square])
+}
+
+#[cfg(not(all(feature = "pext-lookup", target_feature = "bmi2")))]
+pub fn rook_attacks(square: Square, blockers: Bitboard) -> Bitboard {
+    rook_attacks_hq(square, blockers)
+}
+
+#[cfg(not(all(feature = "pext-lookup", target_feature = "bmi2")))]
+pub fn bishop_attacks(square: Square, blockers: Bitboard) -> Bitboard {
+    bishop_attacks_hq(square, blockers)
+}
+
+#[cfg(all(feature = "pext-lookup", target_feature = "bmi2"))]
+pub fn rook_attacks(square: Square, blockers: Bitboard) -> Bitboard {
+    assert!(cfg!(target_feature = "bmi2"), "no bmi2");
+    let index = pext(blockers, RELEVANT_ROOKS[square]).0 as usize;
+    let res = ROOK_LOOKUP[square][index];
+    debug_assert_eq!(res, rook_attacks_hq(square, blockers));
+    res
+}
+
+#[cfg(all(feature = "pext-lookup", target_feature = "bmi2"))]
+pub fn bishop_attacks(square: Square, blockers: Bitboard) -> Bitboard {
+    let index = pext(blockers, RELEVANT_BISHOPS[square]).0 as usize;
+    let res = BISHOP_LOOKUP[square][index];
+    debug_assert_eq!(res, bishop_attacks_hq(square, blockers));
+    res
 }
 
 pub fn queen_attacks(square: Square, blockers: Bitboard) -> Bitboard {

@@ -272,6 +272,12 @@ impl Square {
         Self::try_from(rank as u8 * 8 + file as u8).unwrap()
     }
 
+    // try_from isn't const
+    pub const fn new(square: usize) -> Self {
+        assert!(square < NUM_SQUARES);
+        unsafe { mem::transmute(square as u8) }
+    }
+
     pub fn idx(self) -> u8 {
         self as u8
     }
@@ -284,6 +290,10 @@ impl Square {
         }
     }
 
+    pub fn iter() -> impl Iterator<Item=Self> {
+        (0..64).map(|i| Square::new(i))
+    }
+
     pub fn bb(self) -> Bitboard {
         Bitboard::single(self)
     }
@@ -292,12 +302,16 @@ impl Square {
         Self::try_from(self as u8 ^ 0b111_000).unwrap()
     }
 
-    pub fn file(self) -> File {
-        File::from(self as usize & 0b111)
+    pub const fn file(self) -> File {
+        unsafe {
+            mem::transmute(self as usize & 0b111)
+        }
     }
 
-    pub fn rank(self) -> Rank {
-        Rank::from((self as usize >> 3) & 0b111)
+    pub const fn rank(self) -> Rank {
+        unsafe {
+            mem::transmute((self as usize >> 3) & 0b111)
+        }
     }
 }
 
@@ -346,6 +360,7 @@ impl Bitboard {
     pub const RANK_1: Self = Self(0xFF);
     pub const RANK_8: Self = Self(0xFF00_0000_0000_0000);
     pub const BACKRANKS: Self = Self(Self::RANK_1.0 | Self::RANK_8.0);
+    pub const EDGES: Self = Self(Self::BACKRANKS.0 | Self::A_FILE.0 | Self::H_FILE.0);
 
     pub const fn single(sq: Square) -> Self {
         Self(1 << sq as usize)

@@ -157,7 +157,7 @@ impl Position {
         }
         let mut num_pieces = 0;
         for (i, piece) in self.pieces.mailbox.iter().enumerate() {
-            let sq = Square::try_from(i as u8).unwrap();
+            let sq = Square::new(i);
             let Some(piece) = piece else {
                 if self.occupied_bb().has(sq) {
                     return Err("Bitboards and mailbox differ".into());
@@ -228,7 +228,7 @@ impl Display for Position {
         for rank in (0..8).rev() {
             let mut skip = 0;
             for file in 0..8 {
-                let sq = Square::try_from(rank * 8 + file).unwrap();
+                let sq = Square::new(rank * 8 + file);
                 let Some(p) = self.piece_on(sq) else {
                     skip += 1;
                     continue;
