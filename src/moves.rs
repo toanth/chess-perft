@@ -159,11 +159,10 @@ impl Position {
         let ep = self.ep;
         self.stm = !self.stm;
         self.ep = None;
-        self.pieces.remove_piece(src);
         if self.piece_on(dest).is_some() {
             self.pieces.remove_piece(dest);
         }
-        self.pieces.place_piece(dest, piece);
+        self.pieces.move_piece(src, dest);
         match piece.piece_type() {
             PieceType::Pawn => {
                 if m.is_double_pawn_push() {

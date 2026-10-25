@@ -43,6 +43,16 @@ impl BoardPieces {
         self.colors[piece.color()] &= bb;
         self.pieces[piece.piece_type()] &= bb;
     }
+
+    pub fn move_piece(&mut self, src: Square, dest: Square) {
+        let piece = self.mailbox[src];
+        self.mailbox[src] = None;
+        self.mailbox[dest] = piece;
+        let piece = piece.unwrap();
+        let bb = Bitboard::single(src) ^ Bitboard::single(dest);
+        self.colors[piece.color()] ^= bb;
+        self.pieces[piece.piece_type()] ^= bb;
+    }
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
