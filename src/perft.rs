@@ -118,7 +118,7 @@ impl Display for SplitPerftRes {
         let time = format_time(time);
         write!(
             f,
-            "Finished splitperft depth {depth} in {time} ({nps}nps) with {children} children\nNodes: {nodes}",
+            "Finished splitperft depth {depth} with {children} children in {time} ({nps}nps)\nNodes: {nodes}",
             depth = self.perft_res.depth,
             children = self.children.len(),
         )?;
