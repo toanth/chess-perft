@@ -8,6 +8,8 @@ use crate::test_positions::{ExpectedPerftRes, STANDARD_FENS};
 use std::cmp::min;
 use std::env::args;
 use std::io;
+use std::ops::ControlFlow;
+use std::ops::ControlFlow::{Break, Continue};
 use std::time::Instant;
 
 mod pos;
@@ -37,38 +39,43 @@ fn parse_pos(mut input: &str) -> Res<Position> {
 }
 
 
-fn handle_input(mut line: &str, pos: &mut Position) -> Res<Option<usize>> {
+fn handle_input(mut line: &str, pos: &mut Position) -> Res<ControlFlow<()>> {
     line = line.trim();
-    loop {
-        if line == "x" || line == "quit" {
-            return Ok(None);
-        } else if line == "uci" {
-            println!("id name chess-perft");
-            println!("id author ToTheAnd");
-            println!("uciok");
-        } else if line.starts_with("position ") {
-            *pos = parse_pos(line)?;
-        } else if line == "show" || line == "debug" || line == "d" {
-            println!("{pos}");
-        } else {
-            break;
-        }
+    if line == "x" || line == "quit" {
+        return Ok(Break(()));
+    } else if line == "uci" {
+        println!("id name chess-perft");
+        println!("id author ToTheAnd");
+        println!("uciok");
+        return Ok(Continue(()));
+    } else if line.starts_with("position ") {
+        *pos = parse_pos(line)?;
+        return Ok(Continue(()));
+    } else if line == "show" || line == "debug" || line == "d" {
+        println!("{pos}");
+        return Ok(Continue(()));
     }
+
     line = line.strip_prefix("go ").unwrap_or(line);
     line = line.strip_prefix("perft ").unwrap_or(line);
     line = line.strip_prefix("depth ").unwrap_or(line);
 
     let Some((depth, fen)) = line.split_once(" ") else {
         let depth = line.parse::<usize>().map_err(|_| format!("Failed to parse depth '{line}'"))?;
-        return Ok(Some(depth));
+        println!("{}", splitperft(*pos, depth));
+        return Ok(Continue(()));
     };
     let depth = depth.parse::<usize>().map_err(|_| format!("Failed to parse depth '{depth}'"))?;
     *pos = parse_pos(fen)?;
-    Ok(Some(depth))
+    println!("{}", splitperft(*pos, depth));
+    Ok(Continue(()))
 }
 
 fn run(pos: &mut Position, lines: impl Iterator<Item=String>) -> Option<()> {
     for line in lines {
+        if line.is_empty() {
+            continue;
+        }
         if line == "--benchmark" || line == "-b" {
             benchmark();
             return None;
@@ -78,11 +85,8 @@ fn run(pos: &mut Position, lines: impl Iterator<Item=String>) -> Option<()> {
                 println!("{err}");
                 continue;
             }
-            Ok(None) => return None,
-            Ok(Some(depth)) => {
-                let perft_res = splitperft(*pos, depth);
-                println!("{perft_res}");
-            }
+            Ok(Break(())) => return None,
+            Ok(Continue(())) => {}
         };
     }
     Some(())
