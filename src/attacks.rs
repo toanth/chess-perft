@@ -1,5 +1,6 @@
 use crate::core::Color::{Black, White};
 use crate::core::{Bitboard, File, NUM_PLAYERS, NUM_SQUARES, Rank, Square};
+use std::simd::u64x4;
 #[cfg(all(feature = "pext-lookup", target_feature = "bmi2"))]
 use std::sync::LazyLock;
 
@@ -218,7 +219,6 @@ pub fn queen_attacks(square: Square, blockers: Bitboard) -> Bitboard {
     rook_attacks(square, blockers) | bishop_attacks(square, blockers)
 }
 
-// TODO: Optimize (similar to motors?), also test pext magic bitboards
 fn hq(sq: Square, blockers: Bitboard, ray: Bitboard) -> Bitboard {
     let blockers = blockers & ray;
     let forward = blockers.0.wrapping_sub(Bitboard::single(sq).0);
@@ -396,30 +396,6 @@ pub static RAYS_INFINITE: [[Bitboard; 64]; 64] = {
     res
 };
 
-// TODO: Manual AVX2 impl?
-pub fn kogge_stone<const DIR: usize>(
-    sliders: Bitboard,
-    empty: Bitboard,
-    fwd_filter: Bitboard,
-    bwd_filter: Bitboard,
-) -> Bitboard {
-    let mut forward = sliders;
-    let mut fwd_allowed = empty & fwd_filter;
-    let mut backward = sliders;
-    let mut bwd_allowed = empty & bwd_filter;
-    forward |= fwd_allowed & (forward << DIR);
-    backward |= bwd_allowed & (backward >> DIR);
-    fwd_allowed &= fwd_allowed << DIR;
-    bwd_allowed &= bwd_allowed >> DIR;
-    forward |= fwd_allowed & (forward << 2 * DIR);
-    backward |= bwd_allowed & (backward >> 2 * DIR);
-    fwd_allowed &= fwd_allowed << 2 * DIR;
-    bwd_allowed &= bwd_allowed >> 2 * DIR;
-    forward |= fwd_allowed & (forward << 4 * DIR);
-    backward |= bwd_allowed & (backward >> 4 * DIR);
-    ((forward << DIR) & fwd_filter) | ((backward >> DIR) & bwd_filter)
-}
-
 pub fn all_knight_attacks(knights: Bitboard) -> Bitboard {
     let masks = [
         !Bitboard::A_FILE,
@@ -438,22 +414,72 @@ pub fn all_knight_attacks(knights: Bitboard) -> Bitboard {
     up | down
 }
 
-pub fn all_rook_attacks(sliders: Bitboard, blockers: Bitboard) -> Bitboard {
-    let all = Bitboard(!0);
-    let vertical = kogge_stone::<8>(sliders, !blockers, all, all);
-    let horizontal = kogge_stone::<1>(
-        sliders,
-        !blockers,
-        !Bitboard::A_FILE,
-        !Bitboard::file(File::H),
-    );
-    horizontal | vertical
+type U64x4 = std::simd::Simd<u64, 4>;
+
+pub fn all_slider_attacks(bishops: Bitboard, rooks: Bitboard, blockers: Bitboard) -> Bitboard {
+    let fwd_filters = U64x4::from_array([
+        !Bitboard::A_FILE.0,
+        !Bitboard::H_FILE.0,
+        !0,
+        !Bitboard::A_FILE.0,
+    ]);
+    let bwd_filters = U64x4::from_array([
+        !Bitboard::H_FILE.0,
+        !Bitboard::A_FILE.0,
+        !0,
+        !Bitboard::H_FILE.0,
+    ]);
+    let sliders = U64x4::from_array([bishops.0, bishops.0, rooks.0, rooks.0]);
+    let empty = u64x4::splat(!blockers.0);
+    let mut forward = sliders;
+    let mut backward = sliders;
+    let mut shift = U64x4::from_array([9, 7, 8, 1]);
+    let shift_once = shift;
+    let mut fwd_allowed = empty & fwd_filters;
+    let mut bwd_allowed = empty & bwd_filters;
+    forward |= fwd_allowed & (forward << shift);
+    backward |= bwd_allowed & (backward >> shift);
+    for _ in 0..2 {
+        fwd_allowed &= fwd_allowed << shift;
+        bwd_allowed &= bwd_allowed >> shift;
+        shift <<= 1;
+        forward |= fwd_allowed & (forward << shift);
+        backward |= bwd_allowed & (backward >> shift);
+    }
+    let res = ((forward << shift_once) & fwd_filters) | ((backward >> shift_once) & bwd_filters);
+    let &[a, b, c, d] = res.as_array();
+    Bitboard(a | b | c | d)
 }
 
-pub fn all_bishop_attacks(sliders: Bitboard, blockers: Bitboard) -> Bitboard {
-    let not_a_file = !Bitboard::A_FILE;
-    let not_h_file = !Bitboard::file(File::H);
-    let diagonal = kogge_stone::<9>(sliders, !blockers, not_a_file, not_h_file);
-    let anti_diagonal = kogge_stone::<7>(sliders, !blockers, not_h_file, not_a_file);
-    diagonal | anti_diagonal
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_all_slider_attacks() {
+        let bishops = Bitboard(0);
+        let rooks = Bitboard(0x400);
+        let blockers = Bitboard(0x400);
+        let attacks = all_slider_attacks(bishops, rooks, blockers);
+        let expected = Bitboard(0x40404040404fb04);
+        assert_eq!(attacks, expected);
+        let blockers = Bitboard(0x440018184004);
+        let attacks = all_slider_attacks(bishops, rooks, blockers);
+        let expected = Bitboard(0x40404047b04);
+        assert_eq!(attacks, expected);
+
+        let bishops = Bitboard(0x8000000);
+        let rooks = Bitboard(0x20000000);
+        let blockers = Bitboard(0x200000240000) | rooks | bishops;
+        let attacks = all_slider_attacks(bishops, rooks, blockers);
+        let expected = Bitboard(0x12234d8342040);
+        assert_eq!(attacks, expected);
+
+        let bishops = Bitboard(0x420000004);
+        let rooks = Bitboard(0x2120000000);
+        let blockers = Bitboard(0x806a002520920004);
+        let attacks = all_slider_attacks(bishops, rooks, blockers);
+        let expected = Bitboard(0x2335abfeff71ab21);
+        assert_eq!(attacks, expected);
+    }
 }

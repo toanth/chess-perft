@@ -1,10 +1,11 @@
 // gives a warning for being unused when pext is not enabled
 // (e.g. with `RUSTFLAGS="-C target-cpu=..."`)
 #![feature(alloc_slice_into_array)]
+#![feature(portable_simd)]
 
 use crate::core::Res;
 use crate::moves::Move;
-use crate::perft::{perft_impl, splitperft, PerftRes};
+use crate::perft::{PerftRes, perft_impl, splitperft};
 use crate::pos::Position;
 use crate::test_positions::{ExpectedPerftRes, STANDARD_FENS};
 use std::cmp::min;

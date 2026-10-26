@@ -1,7 +1,7 @@
 use crate::attacks::{
-    all_bishop_attacks, all_knight_attacks, all_rook_attacks, bishop_attacks, horizontal_attacks, queen_attacks, rook_attacks, ANTI_DIAGONALS,
-    BISHOPS, DIAGONALS, KINGS, KNIGHTS, PAWN_CAPTS, RAYS_EXCLUSIVE,
-    RAYS_INCLUSIVE, RAYS_INFINITE, ROOKS,
+    ANTI_DIAGONALS, BISHOPS, DIAGONALS, KINGS, KNIGHTS, PAWN_CAPTS, RAYS_EXCLUSIVE, RAYS_INCLUSIVE,
+    RAYS_INFINITE, ROOKS, all_knight_attacks, all_slider_attacks, bishop_attacks,
+    horizontal_attacks, queen_attacks, rook_attacks,
 };
 use crate::core::Color::{Black, White};
 use crate::core::PieceType::*;
@@ -287,9 +287,8 @@ impl Position {
         res |= all_knight_attacks(self.col_piece_bb(Knight, us));
         let blockers = self.occupied_bb() ^ self.col_piece_bb(King, !us);
         let bishop_sliders = (self.piece_bb(Bishop) | self.piece_bb(Queen)) & self.col_bb(us);
-        res |= all_bishop_attacks(bishop_sliders, blockers);
         let rook_sliders = (self.piece_bb(Rook) | self.piece_bb(Queen)) & self.col_bb(us);
-        res |= all_rook_attacks(rook_sliders, blockers);
+        res |= all_slider_attacks(bishop_sliders, rook_sliders, blockers);
         res
     }
 
