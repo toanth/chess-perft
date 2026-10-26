@@ -421,7 +421,7 @@ impl Iterator for Bitboard {
         if self.0 == 0 {
             None
         } else {
-            Some(self.pop_lsb().try_into().unwrap())
+            unsafe { Some(mem::transmute(self.pop_lsb())) }
         }
     }
 }
