@@ -7,7 +7,7 @@
 use crate::core::Res;
 use crate::moves::Move;
 use crate::perft::BulkCounting::{Bulk, NoBulk};
-use crate::perft::{PerftRes, perft_impl, splitperft};
+use crate::perft::{BulkCounting, PerftRes, perft_impl, splitperft};
 use crate::pos::Position;
 use crate::test_positions::{ExpectedPerftRes, STANDARD_FENS};
 use std::cmp::min;
@@ -91,7 +91,10 @@ fn run(pos: &mut Position, lines: impl Iterator<Item = String>) -> Option<()> {
             continue;
         }
         if line == "--benchmark" || line == "-b" {
-            benchmark();
+            benchmark(Bulk);
+            return None;
+        } else if line == "-bench-no-bulk" || line == "-bnb" {
+            benchmark(NoBulk);
             return None;
         }
         match handle_input(&line, pos) {
@@ -116,8 +119,11 @@ fn main() {
     _ = run(&mut pos, io::stdin().lines().map(|l| l.unwrap()));
 }
 
-fn benchmark() {
-    const MAX_NODES: u64 = 50_000_000;
+fn benchmark(bulk: BulkCounting) {
+    let max_nodes = match bulk {
+        NoBulk => 10_000_000,
+        Bulk => 50_000_000,
+    };
     let expected = STANDARD_FENS
         .iter()
         .map(|&f| ExpectedPerftRes::new(f))
@@ -127,9 +133,12 @@ fn benchmark() {
     let mut nodes = 0;
     let mut min_depth = usize::MAX;
     for (i, r) in expected.iter().enumerate() {
-        let depth = r.res.iter().rposition(|&n| n <= MAX_NODES).unwrap();
+        let depth = r.res.iter().rposition(|&n| n <= max_nodes).unwrap();
         let before = Instant::now();
-        let perft_res = perft_impl::<{ Bulk }>(Position::from_fen(r.fen).unwrap(), depth);
+        let perft_res = match bulk {
+            NoBulk => perft_impl::<{ NoBulk }>(Position::from_fen(r.fen).unwrap(), depth),
+            Bulk => perft_impl::<{ Bulk }>(Position::from_fen(r.fen).unwrap(), depth),
+        };
         nodes += perft_res;
         let elapsed = before.elapsed().as_secs_f64();
         nps.push((perft_res as f64 / elapsed / 1_000_000., r.fen));
