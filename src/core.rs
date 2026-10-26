@@ -7,7 +7,7 @@ use std::mem;
 use std::ops::{Index, IndexMut, Not};
 use std::str::FromStr;
 
-pub type Res<T> = std::result::Result<T, String>;
+pub type Res<T> = Result<T, String>;
 
 pub const NUM_PLAYERS: usize = 2;
 pub const NUM_PIECES: usize = 6;
@@ -52,14 +52,14 @@ impl TryFrom<u8> for PieceType {
 
 impl<T> Index<PieceType> for [T; NUM_PIECES] {
     type Output = T;
-    fn index(&self, index: PieceType) -> &Self::Output {
-        &self[index as usize]
+    fn index(&self, index: PieceType) -> &T {
+        unsafe { self.get_unchecked(index as usize) }
     }
 }
 
 impl<T> IndexMut<PieceType> for [T; NUM_PIECES] {
     fn index_mut(&mut self, index: PieceType) -> &mut T {
-        &mut self[index as usize]
+        unsafe { self.get_unchecked_mut(index as usize) }
     }
 }
 
@@ -88,14 +88,14 @@ impl Not for Color {
 }
 impl<T> Index<Color> for [T; NUM_PLAYERS] {
     type Output = T;
-    fn index(&self, index: Color) -> &Self::Output {
-        &self[index as usize]
+    fn index(&self, index: Color) -> &T {
+        unsafe { self.get_unchecked(index as usize) }
     }
 }
 
 impl<T> IndexMut<Color> for [T; NUM_PLAYERS] {
     fn index_mut(&mut self, index: Color) -> &mut T {
-        &mut self[index as usize]
+        unsafe { self.get_unchecked_mut(index as usize) }
     }
 }
 
@@ -315,14 +315,14 @@ impl Display for Square {
 
 impl<T> Index<Square> for [T; 64] {
     type Output = T;
-    fn index(&self, index: Square) -> &Self::Output {
-        &self[index as usize]
+    fn index(&self, index: Square) -> &T {
+        unsafe { self.get_unchecked(index as usize) }
     }
 }
 
 impl<T> IndexMut<Square> for [T; 64] {
     fn index_mut(&mut self, index: Square) -> &mut T {
-        &mut self[index as usize]
+        unsafe { self.get_unchecked_mut(index as usize) }
     }
 }
 
