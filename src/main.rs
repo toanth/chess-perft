@@ -14,6 +14,7 @@ use std::ops::ControlFlow;
 use std::ops::ControlFlow::{Break, Continue};
 use std::time::Instant;
 
+mod attacks;
 mod core;
 mod movegen;
 mod moves;
@@ -98,7 +99,7 @@ fn run(pos: &mut Position, lines: impl Iterator<Item = String>) -> Option<()> {
 }
 
 fn main() {
-    movegen::force_init();
+    attacks::force_init();
     let mut pos = Position::new();
     let Some(()) = run(&mut pos, args().skip(1)) else {
         return;

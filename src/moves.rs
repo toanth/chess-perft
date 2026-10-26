@@ -1,5 +1,5 @@
+use crate::attacks::RAYS_EXCLUSIVE;
 use crate::core::{ColPiece, Color, PieceType, Res, Square};
-use crate::movegen::RAYS_EXCLUSIVE;
 use crate::pos::Position;
 use arrayvec::ArrayVec;
 use std::fmt::Display;
