@@ -164,7 +164,7 @@ impl Position {
         let src = m.src;
         let dest = m.dest;
         let us = self.stm;
-        let piece = self.piece_on(src).unwrap();
+        let piece = unsafe { self.piece_on(src).unwrap_unchecked() };
         let ep = self.ep;
         self.stm = !self.stm;
         self.ep = None;
@@ -178,7 +178,9 @@ impl Position {
                     let bb = dest.bb();
                     // only done pseudo-legally here
                     if (bb.east() | bb.west()).intersects(self.col_piece_bb(PieceType::Pawn, !us)) {
-                        self.ep = Some(((dest as u8 + src as u8) / 2).try_into().unwrap());
+                        self.ep = unsafe {
+                            Some(((dest as u8 + src as u8) / 2).try_into().unwrap_unchecked())
+                        };
                     }
                 } else if let Some(promo) = m.promo_piece() {
                     self.pieces.pieces[piece.piece_type()] ^= dest.bb();

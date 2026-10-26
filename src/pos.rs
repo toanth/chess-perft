@@ -37,7 +37,7 @@ impl BoardPieces {
     }
 
     pub fn remove_piece(&mut self, sq: Square) {
-        let piece = self.mailbox[sq].unwrap();
+        let piece = unsafe { self.mailbox[sq].unwrap_unchecked() };
         self.mailbox[sq] = None;
         let bb = !Bitboard::single(sq);
         self.colors[piece.color()] &= bb;
@@ -48,7 +48,7 @@ impl BoardPieces {
         let piece = self.mailbox[src];
         self.mailbox[src] = None;
         self.mailbox[dest] = piece;
-        let piece = piece.unwrap();
+        let piece = unsafe { piece.unwrap_unchecked() };
         let bb = Bitboard::single(src) ^ Bitboard::single(dest);
         self.colors[piece.color()] ^= bb;
         self.pieces[piece.piece_type()] ^= bb;
