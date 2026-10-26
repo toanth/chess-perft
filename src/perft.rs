@@ -23,7 +23,9 @@ pub fn perft(pos: Position, depth: usize) -> PerftRes {
     let start = Instant::now();
     let nodes = if depth == 0 {
         1
-    } else { perft_impl(pos, depth) };
+    } else {
+        perft_impl(pos, depth)
+    };
     PerftRes {
         time: start.elapsed(),
         nodes,
@@ -47,11 +49,7 @@ pub fn splitperft(pos: Position, depth: usize) -> SplitPerftRes {
         children.push((m, child_nodes));
     }
     let time = start.elapsed();
-    let perft_res = PerftRes {
-        time,
-        nodes,
-        depth,
-    };
+    let perft_res = PerftRes { time, nodes, depth };
     SplitPerftRes {
         perft_res,
         children,

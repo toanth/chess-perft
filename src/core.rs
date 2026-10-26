@@ -1,4 +1,7 @@
-use derive_more::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not, Shl, ShlAssign, Shr, ShrAssign};
+use derive_more::{
+    BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not, Shl, ShlAssign, Shr,
+    ShrAssign,
+};
 use std::fmt::{Display, Formatter};
 use std::mem;
 use std::ops::{Index, IndexMut, Not};
@@ -60,7 +63,6 @@ impl<T> IndexMut<PieceType> for [T; NUM_PIECES] {
     }
 }
 
-
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[repr(u8)]
 pub enum Color {
@@ -69,7 +71,7 @@ pub enum Color {
 }
 
 impl Color {
-    pub fn iter() -> impl Iterator<Item=Self> {
+    pub fn iter() -> impl Iterator<Item = Self> {
         [Self::White, Self::Black].into_iter()
     }
 }
@@ -137,7 +139,6 @@ impl ColPiece {
         unsafe { mem::transmute(self as u8 % 8) }
     }
 }
-
 
 #[rustfmt::skip]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -224,7 +225,6 @@ impl TryFrom<char> for File {
     }
 }
 
-
 #[rustfmt::skip]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[repr(u8)]
@@ -247,9 +247,7 @@ impl TryFrom<u8> for Square {
         if sq >= 64 {
             Err(format!("{sq} is not a valid Square"))
         } else {
-            unsafe {
-                Ok(mem::transmute(sq))
-            }
+            unsafe { Ok(mem::transmute(sq)) }
         }
     }
 }
@@ -285,12 +283,10 @@ impl Square {
     pub unsafe fn add(self, delta: i8) -> Self {
         let val = self as i8 + delta;
         debug_assert!(val >= 0 && val <= 64);
-        unsafe {
-            mem::transmute(val)
-        }
+        unsafe { mem::transmute(val) }
     }
 
-    pub fn iter() -> impl Iterator<Item=Self> {
+    pub fn iter() -> impl Iterator<Item = Self> {
         (0..64).map(|i| Square::new(i))
     }
 
@@ -303,15 +299,11 @@ impl Square {
     }
 
     pub const fn file(self) -> File {
-        unsafe {
-            mem::transmute(self as usize & 0b111)
-        }
+        unsafe { mem::transmute(self as usize & 0b111) }
     }
 
     pub const fn rank(self) -> Rank {
-        unsafe {
-            mem::transmute((self as usize >> 3) & 0b111)
-        }
+        unsafe { mem::transmute((self as usize >> 3) & 0b111) }
     }
 }
 
@@ -426,7 +418,11 @@ impl Iterator for Bitboard {
     type Item = Square;
 
     fn next(&mut self) -> Option<Square> {
-        if self.0 == 0 { None } else { Some(self.pop_lsb().try_into().unwrap()) }
+        if self.0 == 0 {
+            None
+        } else {
+            Some(self.pop_lsb().try_into().unwrap())
+        }
     }
 }
 

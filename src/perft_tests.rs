@@ -1,7 +1,9 @@
 use crate::moves::Move;
 use crate::perft::perft;
 use crate::pos::Position;
-use crate::test_positions::{ExpectedPerftRes, CHESS_960_FENS, CUSTOM_FENS, INVALID, STANDARD_FENS};
+use crate::test_positions::{
+    ExpectedPerftRes, CHESS_960_FENS, CUSTOM_FENS, INVALID, STANDARD_FENS,
+};
 use rayon::prelude::*;
 use std::io::{stdout, Write};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -18,12 +20,15 @@ fn simple_test() {
 
 #[test]
 fn kiwipete_test() {
-    let pos = Position::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1").unwrap();
+    let pos =
+        Position::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1")
+            .unwrap();
     let res = perft(pos, 4);
     assert_eq!(res.nodes, 4_085_603);
     // kiwipete after white castles (cheaper to run than increasing the depth of kiwipete, and failed perft once in motors)
     let pos =
-        Position::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R4RK1 b kq - 1 1").unwrap();
+        Position::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R4RK1 b kq - 1 1")
+            .unwrap();
     let res = perft(pos, 4);
     assert_eq!(res.nodes, 4_119_629);
     // kiwipete after white plays a2a3
@@ -37,7 +42,8 @@ fn kiwipete_test() {
 #[test]
 fn leonids_position_test() {
     let pos =
-        Position::from_fen("q2k2q1/2nqn2b/1n1P1n1b/2rnr2Q/1NQ1QN1Q/3Q3B/2RQR2B/Q2K2Q1 w - - 0 1").unwrap();
+        Position::from_fen("q2k2q1/2nqn2b/1n1P1n1b/2rnr2Q/1NQ1QN1Q/3Q3B/2RQR2B/Q2K2Q1 w - - 0 1")
+            .unwrap();
     let res = perft(pos, 1);
     assert_eq!(res.nodes, 99);
     assert!(res.time.as_millis() <= 20);
@@ -79,7 +85,6 @@ fn no_choice_test() {
     assert_eq!(res.nodes, 1);
 }
 
-
 // ** The following tests are based on tests by kz04px: <https://github.com/kz04px/rawr/blob/master/tests/perft_extra.rs> **
 
 #[test]
@@ -87,12 +92,27 @@ fn perft_enpassant() {
     let tests = [
         // EP
         ("8/8/8/8/1k1PpN1R/8/8/4K3 b - d3 0 1", vec![1, 9, 193, 1322]),
-        ("8/8/8/8/1k1Ppn1R/8/8/4K3 b - d3 0 1", vec![1, 17, 220, 3001]),
-        ("4k3/8/8/2PpP3/8/8/8/4K3 w - d6 0 1", vec![1, 9, 47, 376, 2321]),
-        ("4k3/8/8/8/2pPp3/8/8/4K3 b - d3 0 1", vec![1, 9, 47, 376, 2321]),
+        (
+            "8/8/8/8/1k1Ppn1R/8/8/4K3 b - d3 0 1",
+            vec![1, 17, 220, 3001],
+        ),
+        (
+            "4k3/8/8/2PpP3/8/8/8/4K3 w - d6 0 1",
+            vec![1, 9, 47, 376, 2321],
+        ),
+        (
+            "4k3/8/8/8/2pPp3/8/8/4K3 b - d3 0 1",
+            vec![1, 9, 47, 376, 2321],
+        ),
         // EP - pinned diagonal
-        ("8/5k2/8/2Pp4/8/1B6/8/6K1 w - d6 0 1", vec![1, 13, 101, 1336]),
-        ("4k3/b7/8/2Pp4/8/4B3/8/6K1 w - d6 0 1", vec![1, 14, 123, 1559]),
+        (
+            "8/5k2/8/2Pp4/8/1B6/8/6K1 w - d6 0 1",
+            vec![1, 13, 101, 1336],
+        ),
+        (
+            "4k3/b7/8/2Pp4/8/4B3/8/6K1 w - d6 0 1",
+            vec![1, 14, 123, 1559],
+        ),
         ("4k3/B7/8/2Pp4/8/8/8/6K1 w - d6 0 1", vec![1, 9, 50, 496]),
         ("4k3/b7/8/2Pp4/8/8/8/6K1 w - d6 0 1", vec![1, 5, 45, 285]),
         ("4k3/7b/8/4pP2/8/8/8/1K6 w - e6 0 1", vec![1, 5, 45, 285]),
@@ -131,8 +151,14 @@ fn perft_enpassant() {
         // EP - pinned vertical
         ("k7/8/4r3/3pP3/8/8/8/4K3 w - d6 0 1", vec![1, 5, 70, 497]),
         ("k3K3/8/8/3pP3/8/8/8/4r3 w - d6 0 1", vec![1, 6, 91, 633]),
-        ("br1knbqr/pp2p1pp/1n6/2p5/3pPpP1/2PQ3B/PP1P1P1P/BRNKN2R b HBhb e3 0 11", vec![1, 30, 866]),
-        ("5r2/1p3k2/pBp1p1b1/3rq1b1/PPR1pPpp/4Q1P1/4P1BP/5RK1 b - f3 0 28", vec![1, 48, 2066]),
+        (
+            "br1knbqr/pp2p1pp/1n6/2p5/3pPpP1/2PQ3B/PP1P1P1P/BRNKN2R b HBhb e3 0 11",
+            vec![1, 30, 866],
+        ),
+        (
+            "5r2/1p3k2/pBp1p1b1/3rq1b1/PPR1pPpp/4Q1P1/4P1BP/5RK1 b - f3 0 28",
+            vec![1, 48, 2066],
+        ),
         // EP - in check
         ("4k3/8/8/4pP2/3K4/8/8/8 w - e6 0 1", vec![1, 9, 49, 364]),
         ("8/8/8/4k3/5Pp1/8/8/3K4 b - f3 0 1", vec![1, 9, 50, 374]),
@@ -167,18 +193,42 @@ fn perft_double_checked() {
 #[test]
 fn perft_pins() {
     let tests = [
-        ("4k3/8/8/8/1b5b/8/3Q4/4K3 w - - 0 1", [1, 3, 54, 1256, 20328]),
+        (
+            "4k3/8/8/8/1b5b/8/3Q4/4K3 w - - 0 1",
+            [1, 3, 54, 1256, 20328],
+        ),
         ("4k3/8/8/8/1b5b/8/3R4/4K3 w - - 0 1", [1, 3, 54, 836, 14835]),
-        ("4k3/8/8/8/1b5b/2Q5/5P2/4K3 w - - 0 1", [1, 6, 98, 2274, 34581]),
-        ("4k3/8/8/8/1b5b/2R5/5P2/4K3 w - - 0 1", [1, 4, 72, 1300, 23118]),
-        ("4k3/8/8/8/1b2r3/8/3Q4/4K3 w - - 0 1", [1, 3, 66, 1390, 29093]),
-        ("4k3/8/8/8/1b2r3/8/3QP3/4K3 w - - 0 1", [1, 6, 119, 2074, 40736]),
+        (
+            "4k3/8/8/8/1b5b/2Q5/5P2/4K3 w - - 0 1",
+            [1, 6, 98, 2274, 34581],
+        ),
+        (
+            "4k3/8/8/8/1b5b/2R5/5P2/4K3 w - - 0 1",
+            [1, 4, 72, 1300, 23118],
+        ),
+        (
+            "4k3/8/8/8/1b2r3/8/3Q4/4K3 w - - 0 1",
+            [1, 3, 66, 1390, 29093],
+        ),
+        (
+            "4k3/8/8/8/1b2r3/8/3QP3/4K3 w - - 0 1",
+            [1, 6, 119, 2074, 40736],
+        ),
         // Additional position with some rather tricky cases
-        ("1k6/8/1q3b2/2R1P3/r1RK1B1r/8/8/8 w - - 0 1", [1, 8, 276, 4995, 180603]),
+        (
+            "1k6/8/1q3b2/2R1P3/r1RK1B1r/8/8/8 w - - 0 1",
+            [1, 8, 276, 4995, 180603],
+        ),
         // castling out of a pin
-        ("3k4/4r3/8/8/8/4B3/8/R3K3 w Q - 0 1", [1, 16, 214, 4814, 72521]),
+        (
+            "3k4/4r3/8/8/8/4B3/8/R3K3 w Q - 0 1",
+            [1, 16, 214, 4814, 72521],
+        ),
         // even more weird pins
-        ("3q3r/7R/3r3Q/B2R2rk/1b3B1p/2B1Pp2/1qNKBR2/4B3 b - - 21 42", [1, 2, 84, 3342, 130469]),
+        (
+            "3q3r/7R/3r3Q/B2R2rk/1b3B1p/2B1Pp2/1qNKBR2/4B3 b - - 21 42",
+            [1, 2, 84, 3342, 130469],
+        ),
     ];
 
     for (fen, results) in tests {
@@ -193,7 +243,10 @@ fn perft_pins() {
 #[test]
 fn perft_dfrc() {
     let tests = [
-        ("2r1kr2/8/8/8/8/8/8/1R2K1R1 w GBfc - 0 1", [1, 22, 501, 11459]),
+        (
+            "2r1kr2/8/8/8/8/8/8/1R2K1R1 w GBfc - 0 1",
+            [1, 22, 501, 11459],
+        ),
         ("rkr5/8/8/8/8/8/8/5RKR w HFca - 0 1", [1, 22, 442, 10217]),
         ("2r3kr/8/8/8/8/8/8/2KRR3 w h - 3 2", [1, 3, 72, 1371]),
         ("5rkr/8/8/8/8/8/8/RKR5 w CAhf - 0 1", [1, 22, 442, 10206]),
@@ -229,7 +282,6 @@ fn dfrc_perft_test() {
     perft_test(&FENS);
 }
 
-
 #[test]
 #[ignore]
 fn standard_perft_test() {
@@ -260,9 +312,18 @@ fn perft_test(fens: &'static [&'static str]) {
         stdout().flush().unwrap();
         let fen = pos.to_string();
         let pos2 = Position::from_fen(&fen).unwrap();
-        assert_eq!(pos, pos2, "Boards differ: '{pos }' vs '{pos2}', fen was '{}'\n{pos:?}\n{pos2:?}", expected.fen);
+        assert_eq!(
+            pos, pos2,
+            "Boards differ: '{pos }' vs '{pos2}', fen was '{}'\n{pos:?}\n{pos2:?}",
+            expected.fen
+        );
 
-        for (depth, expected_count) in expected.res.iter().enumerate().filter(|&(_, x)| *x != INVALID) {
+        for (depth, expected_count) in expected
+            .res
+            .iter()
+            .enumerate()
+            .filter(|&(_, x)| *x != INVALID)
+        {
             let res = perft(pos, depth);
             assert_eq!(res.depth, depth);
             assert_eq!(res.nodes, *expected_count, "{depth} {pos}");

@@ -122,7 +122,10 @@ const RELEVANT_COMBINATIONS: usize = 1 << 12;
 type SliderGen = fn(Square, Bitboard) -> Bitboard;
 
 #[cfg(all(feature = "pext-lookup", target_feature = "bmi2"))]
-fn calc_slider_table(slider_gen: SliderGen, relevant: &[Bitboard; NUM_SQUARES]) -> Box<[[Bitboard; RELEVANT_COMBINATIONS]; NUM_SQUARES]> {
+fn calc_slider_table(
+    slider_gen: SliderGen,
+    relevant: &[Bitboard; NUM_SQUARES],
+) -> Box<[[Bitboard; RELEVANT_COMBINATIONS]; NUM_SQUARES]> {
     let mut sliders = vec![[Bitboard(0); RELEVANT_COMBINATIONS]; NUM_SQUARES];
     for sq in Square::iter() {
         debug_assert!(!relevant[sq].has(sq));
@@ -158,16 +161,16 @@ fn calc_bishops() -> Box<[[Bitboard; RELEVANT_COMBINATIONS]; NUM_SQUARES]> {
 // even on targets where pext is known to exist and be fast, which makes it essentially useless.
 #[cfg(all(feature = "pext-lookup", target_feature = "bmi2"))]
 fn pext(bb: Bitboard, mask: Bitboard) -> Bitboard {
-    unsafe {
-        Bitboard(std::arch::x86_64::_pext_u64(bb.0, mask.0))
-    }
+    unsafe { Bitboard(std::arch::x86_64::_pext_u64(bb.0, mask.0)) }
 }
 
 #[cfg(all(feature = "pext-lookup", target_feature = "bmi2"))]
-static ROOK_LOOKUP: LazyLock<Box<[[Bitboard; RELEVANT_COMBINATIONS]; NUM_SQUARES]>> = LazyLock::new(|| calc_rooks());
+static ROOK_LOOKUP: LazyLock<Box<[[Bitboard; RELEVANT_COMBINATIONS]; NUM_SQUARES]>> =
+    LazyLock::new(|| calc_rooks());
 
 #[cfg(all(feature = "pext-lookup", target_feature = "bmi2"))]
-static BISHOP_LOOKUP: LazyLock<Box<[[Bitboard; RELEVANT_COMBINATIONS]; NUM_SQUARES]>> = LazyLock::new(|| calc_bishops());
+static BISHOP_LOOKUP: LazyLock<Box<[[Bitboard; RELEVANT_COMBINATIONS]; NUM_SQUARES]>> =
+    LazyLock::new(|| calc_bishops());
 
 pub fn force_init() {
     #[cfg(all(feature = "pext-lookup", target_feature = "bmi2"))]
@@ -178,7 +181,11 @@ pub fn force_init() {
 }
 
 pub fn rook_attacks_hq(square: Square, blockers: Bitboard) -> Bitboard {
-    hq(square, blockers, Bitboard::file(square.file()) ^ square.bb()) | horizontal_attacks(square, blockers)
+    hq(
+        square,
+        blockers,
+        Bitboard::file(square.file()) ^ square.bb(),
+    ) | horizontal_attacks(square, blockers)
 }
 
 pub fn bishop_attacks_hq(square: Square, blockers: Bitboard) -> Bitboard {
@@ -197,7 +204,6 @@ pub fn bishop_attacks(square: Square, blockers: Bitboard) -> Bitboard {
 
 #[cfg(all(feature = "pext-lookup", target_feature = "bmi2"))]
 pub fn rook_attacks(square: Square, blockers: Bitboard) -> Bitboard {
-    assert!(cfg!(target_feature = "bmi2"), "no bmi2");
     let index = pext(blockers, RELEVANT_ROOKS[square]).0 as usize;
     let res = ROOK_LOOKUP[square][index];
     debug_assert_eq!(res, rook_attacks_hq(square, blockers));
@@ -220,7 +226,10 @@ pub fn queen_attacks(square: Square, blockers: Bitboard) -> Bitboard {
 fn hq(sq: Square, blockers: Bitboard, ray: Bitboard) -> Bitboard {
     let blockers = blockers & ray;
     let forward = blockers.0.wrapping_sub(Bitboard::single(sq).0);
-    let backwards = blockers.swap_bytes().0.wrapping_sub(Bitboard::single(sq).swap_bytes().0);
+    let backwards = blockers
+        .swap_bytes()
+        .0
+        .wrapping_sub(Bitboard::single(sq).swap_bytes().0);
     Bitboard(forward ^ backwards.swap_bytes()) & ray
 }
 
@@ -262,7 +271,11 @@ const fn steps(n: usize) -> Bitboard {
 }
 
 const fn remove_ones_above(bb: u64, idx: usize) -> u64 {
-    if idx < 64 { bb & (u64::MAX >> (63 - idx)) } else { bb }
+    if idx < 64 {
+        bb & (u64::MAX >> (63 - idx))
+    } else {
+        bb
+    }
 }
 
 const fn remove_ones_below(bb: u64, idx: usize) -> u64 {
@@ -296,7 +309,6 @@ pub const ANTI_DIAGONALS: [Bitboard; NUM_SQUARES] = {
     while i < 64 {
         let anti_diag = i / 8 + i % 8;
         res[i] = Bitboard(remove_ones_above(steps.0 << anti_diag, anti_diag * 8) ^ (1 << i));
-        #[allow(clippy::assign_op_pattern)]
         if anti_diag >= 8 {
             res[i] = Bitboard(remove_ones_below(res[i].0, (anti_diag - 8 + 2) * 8 - 1));
         }
@@ -419,15 +431,26 @@ pub fn all_knight_attacks(knights: Bitboard) -> Bitboard {
         !Bitboard::file(File::H),
         !(Bitboard::file(File::G) | Bitboard::file(File::H)),
     ];
-    let up = ((knights & masks[0]) << 2 * 8 - 1) | ((knights & masks[1]) << 8 - 2) | ((knights & masks[2]) << 2 * 8 + 1) | ((knights & masks[3]) << 8 + 2);
-    let down = ((knights & masks[0]) >> 2 * 8 + 1) | ((knights & masks[1]) >> 8 + 2) | ((knights & masks[2]) >> 2 * 8 - 1) | ((knights & masks[3]) >> 8 - 2);
+    let up = ((knights & masks[0]) << 2 * 8 - 1)
+        | ((knights & masks[1]) << 8 - 2)
+        | ((knights & masks[2]) << 2 * 8 + 1)
+        | ((knights & masks[3]) << 8 + 2);
+    let down = ((knights & masks[0]) >> 2 * 8 + 1)
+        | ((knights & masks[1]) >> 8 + 2)
+        | ((knights & masks[2]) >> 2 * 8 - 1)
+        | ((knights & masks[3]) >> 8 - 2);
     up | down
 }
 
 pub fn all_rook_attacks(sliders: Bitboard, blockers: Bitboard) -> Bitboard {
     let all = Bitboard(!0);
     let vertical = kogge_stone::<8>(sliders, !blockers, all, all);
-    let horizontal = kogge_stone::<1>(sliders, !blockers, !Bitboard::A_FILE, !Bitboard::file(File::H));
+    let horizontal = kogge_stone::<1>(
+        sliders,
+        !blockers,
+        !Bitboard::A_FILE,
+        !Bitboard::file(File::H),
+    );
     horizontal | vertical
 }
 
@@ -438,7 +461,6 @@ pub fn all_bishop_attacks(sliders: Bitboard, blockers: Bitboard) -> Bitboard {
     let anti_diagonal = kogge_stone::<7>(sliders, !blockers, not_h_file, not_a_file);
     diagonal | anti_diagonal
 }
-
 
 pub trait MoveGenCallback {
     fn gen_attacks(&mut self, bb: Bitboard, src: Square, flag: MoveFlags);
@@ -510,14 +532,17 @@ impl Position {
         res
     }
 
-    pub fn legal_moves_impl<C: MoveGenCallback>(&self, mut callback: C)
-    {
+    pub fn legal_moves_impl<C: MoveGenCallback>(&self, mut callback: C) {
         let us = self.stm;
         let king = self.king_sq(us);
         let our_pieces = self.pieces.colors[us];
         let (checkers, pinned) = self.calc_checkers_and_pinned(king, us);
         let relevant_attacks = self.calc_relevant_attacks_for(!us);
-        callback.gen_attacks(KINGS[king] & !our_pieces & !relevant_attacks, king, MoveFlags::Normal);
+        callback.gen_attacks(
+            KINGS[king] & !our_pieces & !relevant_attacks,
+            king,
+            MoveFlags::Normal,
+        );
         let check_ray = match checkers.count_ones() {
             0 => Bitboard(!0),
             1 => RAYS_INCLUSIVE[king][checkers.sq()],
@@ -529,11 +554,35 @@ impl Position {
         }
         let blockers = self.occupied_bb();
         let bishops = self.col_piece_bb(Bishop, us);
-        Self::gen_sliders(bishops, pinned, blockers, filter, king, bishop_attacks, &mut callback);
+        Self::gen_sliders(
+            bishops,
+            pinned,
+            blockers,
+            filter,
+            king,
+            bishop_attacks,
+            &mut callback,
+        );
         let rooks = self.col_piece_bb(Rook, us);
-        Self::gen_sliders(rooks, pinned, blockers, filter, king, rook_attacks, &mut callback);
+        Self::gen_sliders(
+            rooks,
+            pinned,
+            blockers,
+            filter,
+            king,
+            rook_attacks,
+            &mut callback,
+        );
         let queens = self.col_piece_bb(Queen, us);
-        Self::gen_sliders(queens, pinned, blockers, filter, king, queen_attacks, &mut callback);
+        Self::gen_sliders(
+            queens,
+            pinned,
+            blockers,
+            filter,
+            king,
+            queen_attacks,
+            &mut callback,
+        );
         if us == White {
             self.gen_pawns::<true, C>(pinned, check_ray, &mut callback);
         } else {
@@ -545,18 +594,29 @@ impl Position {
                 let king_dest = Self::CASTLE_KING_DESTS[us][i];
                 let rook_dest = Self::CASTLE_ROOK_DESTS[us][i];
                 if !RAYS_INCLUSIVE[king][king_dest].intersects(blockers | relevant_attacks)
-                    && !RAYS_INCLUSIVE[rook][rook_dest].intersects(blockers) && !pinned.has(rook)
+                    && !RAYS_INCLUSIVE[rook][rook_dest].intersects(blockers)
+                    && !pinned.has(rook)
                 {
-                    let flag = if i == 0 { MoveFlags::CastleQueenside } else { MoveFlags::CastleKingside };
+                    let flag = if i == 0 {
+                        MoveFlags::CastleQueenside
+                    } else {
+                        MoveFlags::CastleKingside
+                    };
                     callback.gen_single(king, rook, flag);
                 }
             }
         }
     }
 
-
-    fn gen_sliders<F>(sliders: Bitboard, pinned: Bitboard, blockers: Bitboard, filter: Bitboard, king: Square, f: F, callback: &mut impl MoveGenCallback)
-    where
+    fn gen_sliders<F>(
+        sliders: Bitboard,
+        pinned: Bitboard,
+        blockers: Bitboard,
+        filter: Bitboard,
+        king: Square,
+        f: F,
+        callback: &mut impl MoveGenCallback,
+    ) where
         F: Fn(Square, Bitboard) -> Bitboard,
     {
         for src in sliders & !pinned {
@@ -568,8 +628,12 @@ impl Position {
         }
     }
 
-    fn gen_pawns<const WHITE: bool, Callback>(&self, pinned: Bitboard, check_ray: Bitboard, callback: &mut impl MoveGenCallback)
-    {
+    fn gen_pawns<const WHITE: bool, Callback>(
+        &self,
+        pinned: Bitboard,
+        check_ray: Bitboard,
+        callback: &mut impl MoveGenCallback,
+    ) {
         debug_assert_eq!(WHITE, self.stm == White);
         let us = if WHITE { White } else { Black };
         let king = self.king_sq(us);
@@ -579,8 +643,14 @@ impl Position {
         let captures = their_pieces & check_ray;
         let pawns = self.col_piece_bb(Pawn, us);
         let pushable = pawns & (!pinned | Bitboard::file(king.file()));
-        let push = |bb: Bitboard| { if WHITE { bb.north() } else { bb.south() } };
-        let (w, e) = if WHITE { (ANTI_DIAGONALS[king], DIAGONALS[king]) } else { (DIAGONALS[king], ANTI_DIAGONALS[king]) };
+        let push = |bb: Bitboard| {
+            if WHITE { bb.north() } else { bb.south() }
+        };
+        let (w, e) = if WHITE {
+            (ANTI_DIAGONALS[king], DIAGONALS[king])
+        } else {
+            (DIAGONALS[king], ANTI_DIAGONALS[king])
+        };
         let captures_west = pawns & (!pinned | w);
         let captures_east = pawns & (!pinned | e);
         let captures_west = push(captures_west).west() & captures;
@@ -588,7 +658,11 @@ impl Position {
         let double_push_rank = if WHITE { Rank::R4 } else { Rank::R5 };
         let promo_rank = if WHITE { Rank::R8 } else { Rank::R1 };
         let promo_rank = Bitboard::rank(promo_rank);
-        let offsets = if WHITE { [-8, -16, -7, -9] } else { [8, 16, 9, 7] };
+        let offsets = if WHITE {
+            [-8, -16, -7, -9]
+        } else {
+            [8, 16, 9, 7]
+        };
         unsafe {
             let pushed = push(pushable);
             callback.gen_pawns(pushed & quiets & !promo_rank, offsets[0], MoveFlags::Normal);
@@ -609,7 +683,8 @@ impl Position {
                 if king.rank() == captured.rank() && can_capture.0 != 0 {
                     let sq_bb = Bitboard(can_capture.0.isolate_lowest_one());
                     let occ_bb = (self.occupied_bb() ^ sq_bb) & !captured.bb();
-                    let possibly_pinning = (self.piece_bb(Rook) | self.piece_bb(Queen)) & self.col_bb(!us);
+                    let possibly_pinning =
+                        (self.piece_bb(Rook) | self.piece_bb(Queen)) & self.col_bb(!us);
                     // horizontally "pinned" e.p. pawn: The capturing pawn and victim are blocking a check together.
                     if horizontal_attacks(king, occ_bb).intersects(possibly_pinning) {
                         // Only the moved pawn and the capturing pawn are between the king and a horizontal slider,
@@ -618,7 +693,9 @@ impl Position {
                     }
                 }
                 for src in can_capture {
-                    if !pinned.intersects(src.bb()) || RAYS_INFINITE[self.king_sq(us)][src].intersects(ep.bb()) {
+                    if !pinned.intersects(src.bb())
+                        || RAYS_INFINITE[self.king_sq(us)][src].intersects(ep.bb())
+                    {
                         callback.gen_single(src, ep, MoveFlags::Normal)
                     }
                 }
@@ -633,25 +710,16 @@ impl Position {
         match piece {
             Pawn => {
                 let single_push = sq.bb().pawn_push(us) & !self.occupied_bb();
-                let double_pushable = single_push & (Bitboard::rank(Rank::R3) | Bitboard::rank(Rank::R6));
+                let double_pushable =
+                    single_push & (Bitboard::rank(Rank::R3) | Bitboard::rank(Rank::R6));
                 let double_push = double_pushable.pawn_push(us) & !self.occupied_bb();
                 Self::pawn_attacks(sq.bb(), us) | single_push | double_push
             }
-            Knight => {
-                KNIGHTS[sq]
-            }
-            Bishop => {
-                bishop_attacks(sq, blockers)
-            }
-            Rook => {
-                rook_attacks(sq, blockers)
-            }
-            Queen => {
-                queen_attacks(sq, blockers)
-            }
-            King => {
-                KINGS[sq]
-            }
+            Knight => KNIGHTS[sq],
+            Bishop => bishop_attacks(sq, blockers),
+            Rook => rook_attacks(sq, blockers),
+            Queen => queen_attacks(sq, blockers),
+            King => KINGS[sq],
         }
     }
 
@@ -678,9 +746,9 @@ impl Position {
 
     pub fn calc_checkers_and_pinned(&self, king: Square, us: Color) -> (Bitboard, Bitboard) {
         let blockers = self.occupied_bb();
-        let mut checkers =
-            ((PAWN_CAPTS[us][king] & self.piece_bb(Pawn))
-                | (KNIGHTS[king] & self.piece_bb(Knight))) & self.col_bb(!us);
+        let mut checkers = ((PAWN_CAPTS[us][king] & self.piece_bb(Pawn))
+            | (KNIGHTS[king] & self.piece_bb(Knight)))
+            & self.col_bb(!us);
         let rook_sliders = self.piece_bb(Rook) | self.piece_bb(Queen);
         let bishop_sliders = self.piece_bb(Bishop) | self.piece_bb(Queen);
         let mut pinned = Bitboard(0);
@@ -694,9 +762,6 @@ impl Position {
                 _ => {}
             }
         }
-        (
-            checkers,
-            pinned,
-        )
+        (checkers, pinned)
     }
 }

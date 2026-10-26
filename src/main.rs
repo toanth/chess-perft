@@ -1,3 +1,5 @@
+// gives a warning for being unused when pext is not enabled
+// (e.g. with `RUSTFLAGS="-C target-cpu=..."`)
 #![feature(alloc_slice_into_array)]
 
 use crate::core::Res;
@@ -12,13 +14,13 @@ use std::ops::ControlFlow;
 use std::ops::ControlFlow::{Break, Continue};
 use std::time::Instant;
 
-mod pos;
-mod movegen;
 mod core;
+mod movegen;
 mod moves;
 mod perft;
 #[cfg(test)]
 mod perft_tests;
+mod pos;
 mod test_positions;
 
 fn parse_pos(mut input: &str) -> Res<Position> {
@@ -37,7 +39,6 @@ fn parse_pos(mut input: &str) -> Res<Position> {
     }
     Ok(pos)
 }
-
 
 fn handle_input(mut line: &str, pos: &mut Position) -> Res<ControlFlow<()>> {
     line = line.trim();
@@ -61,17 +62,21 @@ fn handle_input(mut line: &str, pos: &mut Position) -> Res<ControlFlow<()>> {
     line = line.strip_prefix("depth ").unwrap_or(line);
 
     let Some((depth, fen)) = line.split_once(" ") else {
-        let depth = line.parse::<usize>().map_err(|_| format!("Failed to parse depth '{line}'"))?;
+        let depth = line
+            .parse::<usize>()
+            .map_err(|_| format!("Failed to parse depth '{line}'"))?;
         println!("{}", splitperft(*pos, depth));
         return Ok(Continue(()));
     };
-    let depth = depth.parse::<usize>().map_err(|_| format!("Failed to parse depth '{depth}'"))?;
+    let depth = depth
+        .parse::<usize>()
+        .map_err(|_| format!("Failed to parse depth '{depth}'"))?;
     *pos = parse_pos(fen)?;
     println!("{}", splitperft(*pos, depth));
     Ok(Continue(()))
 }
 
-fn run(pos: &mut Position, lines: impl Iterator<Item=String>) -> Option<()> {
+fn run(pos: &mut Position, lines: impl Iterator<Item = String>) -> Option<()> {
     for line in lines {
         if line.is_empty() {
             continue;
@@ -95,7 +100,7 @@ fn run(pos: &mut Position, lines: impl Iterator<Item=String>) -> Option<()> {
 fn main() {
     movegen::force_init();
     let mut pos = Position::new();
-    let Some(()) = run(&mut pos, args().skip(1))  else {
+    let Some(()) = run(&mut pos, args().skip(1)) else {
         return;
     };
     println!("Enter a depth and FEN, or 'x' to quit");
@@ -104,7 +109,10 @@ fn main() {
 
 fn benchmark() {
     const MAX_NODES: u64 = 50_000_000;
-    let expected = STANDARD_FENS.iter().map(|&f| ExpectedPerftRes::new(f)).collect::<Vec<_>>();
+    let expected = STANDARD_FENS
+        .iter()
+        .map(|&f| ExpectedPerftRes::new(f))
+        .collect::<Vec<_>>();
     let mut nps = Vec::with_capacity(expected.len());
     let start = Instant::now();
     let mut nodes = 0;
@@ -117,7 +125,11 @@ fn benchmark() {
         let elapsed = before.elapsed().as_secs_f64();
         nps.push((perft_res as f64 / elapsed / 1_000_000., r.fen));
         min_depth = min(min_depth, depth);
-        assert_eq!(r.res[depth], perft_res, "position {i}, depth {depth}, FEN '{}'", r.fen);
+        assert_eq!(
+            r.res[depth], perft_res,
+            "position {i}, depth {depth}, FEN '{}'",
+            r.fen
+        );
     }
     let time = start.elapsed();
     let res = PerftRes {
@@ -136,5 +148,7 @@ fn benchmark() {
     let l = nps[1];
     let h = nps[n - 1];
     println!("{res}");
-    println!("Mnps: avg {avg:.1}, median {median:.1}, 5th/95th percentile [{a:.1}, {b:.1}], span[{l:.1}, {h:.1}]");
+    println!(
+        "Mnps: avg {avg:.1}, median {median:.1}, 5th/95th percentile [{a:.1}, {b:.1}], span[{l:.1}, {h:.1}]"
+    );
 }

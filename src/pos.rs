@@ -85,8 +85,15 @@ impl Position {
         let mut file = 0;
         for c in board.chars() {
             if c == '/' {
-                if file != 8 { return Err(format!("Invalid row length '{}' in first FEN part", file + 1)); }
-                if rank == 0 { return Err("Too many rows in first FEN part".into()); }
+                if file != 8 {
+                    return Err(format!(
+                        "Invalid row length '{}' in first FEN part",
+                        file + 1
+                    ));
+                }
+                if rank == 0 {
+                    return Err("Too many rows in first FEN part".into());
+                }
                 rank -= 1;
                 file = 0;
             } else if c.is_digit(9) && c != '0' {
@@ -124,16 +131,23 @@ impl Position {
                 let rook = ColPiece::new(color, Rook);
                 match c.to_ascii_lowercase() {
                     'q' => {
-                        let Some(rook) = (0..king_file).find(|i| pieces.mailbox[(i + 8 * rank as u8) as usize] == Some(rook)) else {
+                        let Some(rook) = (0..king_file)
+                            .find(|i| pieces.mailbox[(i + 8 * rank as u8) as usize] == Some(rook))
+                        else {
                             return Err(format!("Missing {color} rook to castle with queenside"));
                         };
-                        castling[color][Queenside as usize] = Some(Square::try_from(rook + 8 * rank as u8)?);
+                        castling[color][Queenside as usize] =
+                            Some(Square::try_from(rook + 8 * rank as u8)?);
                     }
                     'k' => {
-                        let Some(rook) = (king_file + 1..8).rev().find(|i| pieces.mailbox[(i + 8 * rank as u8) as usize] == Some(rook)) else {
+                        let Some(rook) = (king_file + 1..8)
+                            .rev()
+                            .find(|i| pieces.mailbox[(i + 8 * rank as u8) as usize] == Some(rook))
+                        else {
                             return Err(format!("Missing {color} rook to castle with kingside"));
                         };
-                        castling[color][Kingside as usize] = Some(Square::try_from(rook + 8 * rank as u8)?);
+                        castling[color][Kingside as usize] =
+                            Some(Square::try_from(rook + 8 * rank as u8)?);
                     }
                     f @ 'a'..='h' => {
                         let file = File::try_from(f)?;
@@ -146,8 +160,17 @@ impl Position {
             }
         }
         let ep_str = fen.next().ok_or("Missing ep part in FEN")?;
-        let ep = if ep_str == "-" { None } else { Some(ep_str.parse()?) };
-        let res = Self { pieces, castling, ep, stm };
+        let ep = if ep_str == "-" {
+            None
+        } else {
+            Some(ep_str.parse()?)
+        };
+        let res = Self {
+            pieces,
+            castling,
+            ep,
+            stm,
+        };
         res.check_valid()
     }
 
@@ -175,7 +198,9 @@ impl Position {
                 continue;
             };
             num_pieces += 1;
-            if !self.pieces.colors[piece.color()].has(sq) || !self.pieces.pieces[piece.piece_type()].has(sq) {
+            if !self.pieces.colors[piece.color()].has(sq)
+                || !self.pieces.pieces[piece.piece_type()].has(sq)
+            {
                 return Err("Bitboards and mailbox differ".into());
             }
         }
@@ -188,13 +213,25 @@ impl Position {
         for c in Color::iter() {
             for (i, &side) in self.castling[c].iter().enumerate() {
                 if let Some(sq) = side {
-                    if self.piece_on(sq) != Some(ColPiece::new(c, Rook)) || sq.rank() != Rank::try_from(7 * c as usize).unwrap() || sq.file().cmp(&self.king_sq(c).file()) != if i == 0 { Ordering::Less } else { Ordering::Greater } {
+                    if self.piece_on(sq) != Some(ColPiece::new(c, Rook))
+                        || sq.rank() != Rank::try_from(7 * c as usize).unwrap()
+                        || sq.file().cmp(&self.king_sq(c).file())
+                            != if i == 0 {
+                                Ordering::Less
+                            } else {
+                                Ordering::Greater
+                            }
+                    {
                         return Err("Incorrect castling flag".into());
                     }
                 }
             }
         }
-        if self.calc_checkers_and_pinned(self.king_sq(!self.stm), !self.stm).0 != Bitboard(0) {
+        if self
+            .calc_checkers_and_pinned(self.king_sq(!self.stm), !self.stm)
+            .0
+            != Bitboard(0)
+        {
             return Err("The inactive player is in check".into());
         }
         Ok(self)
@@ -228,9 +265,11 @@ impl Position {
         self.pieces.colors[White] | self.pieces.colors[Black]
     }
 
-    pub const CASTLE_ROOK_DESTS: [[Square; 2]; NUM_PLAYERS] = [[Square::D1, Square::F1], [Square::D8, Square::F8]];
+    pub const CASTLE_ROOK_DESTS: [[Square; 2]; NUM_PLAYERS] =
+        [[Square::D1, Square::F1], [Square::D8, Square::F8]];
 
-    pub const CASTLE_KING_DESTS: [[Square; 2]; NUM_PLAYERS] = [[Square::C1, Square::G1], [Square::C8, Square::G8]];
+    pub const CASTLE_KING_DESTS: [[Square; 2]; NUM_PLAYERS] =
+        [[Square::C1, Square::G1], [Square::C8, Square::G8]];
 }
 
 impl Display for Position {

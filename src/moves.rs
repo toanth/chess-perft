@@ -29,11 +29,7 @@ pub struct Move {
 
 impl Move {
     pub fn new(src: Square, dest: Square, flags: MoveFlags) -> Self {
-        Self {
-            src,
-            dest,
-            flags,
-        }
+        Self { src, dest, flags }
     }
 
     fn src_sq(self) -> Square {
@@ -52,9 +48,7 @@ impl Move {
         if (self.flags() as u8) >= MoveFlags::Normal as u8 {
             None
         } else {
-            unsafe {
-                Some(mem::transmute(self.flags))
-            }
+            unsafe { Some(mem::transmute(self.flags)) }
         }
     }
 
@@ -72,12 +66,16 @@ impl Move {
         }
         let len = s.len();
         if ![4, 5].contains(&len) {
-            return Err(format!("Move '{s}' has incorrect length, must be 4 or 5 characters"));
+            return Err(format!(
+                "Move '{s}' has incorrect length, must be 4 or 5 characters"
+            ));
         }
         let src = Square::from_str(&s[..2])?;
         let dest = Square::from_str(&s[2..4])?;
         let Some(piece) = pos.piece_on(src) else {
-            return Err(format!("No piece on start square {src} of move '{s}' in {pos}"));
+            return Err(format!(
+                "No piece on start square {src} of move '{s}' in {pos}"
+            ));
         };
         let flags = if len == 5 {
             match s.chars().last().unwrap() {
@@ -88,7 +86,11 @@ impl Move {
                 x => return Err(format!("Invalid promotion piece type '{x}'")),
             }
         } else if piece.piece_type() == PieceType::King {
-            if pos.piece_on(dest).is_some_and(|p| p.color() == piece.color()) || (dest.file() as usize).abs_diff(src.file() as usize) > 1 {
+            if pos
+                .piece_on(dest)
+                .is_some_and(|p| p.color() == piece.color())
+                || (dest.file() as usize).abs_diff(src.file() as usize) > 1
+            {
                 if dest.file() < src.file() {
                     MoveFlags::CastleQueenside
                 } else {
@@ -97,7 +99,9 @@ impl Move {
             } else {
                 MoveFlags::Normal
             }
-        } else if piece.piece_type() == PieceType::Pawn && (dest.rank() as usize).abs_diff(src.rank() as usize) > 1 {
+        } else if piece.piece_type() == PieceType::Pawn
+            && (dest.rank() as usize).abs_diff(src.rank() as usize) > 1
+        {
             MoveFlags::DoublePawnPush
         } else {
             MoveFlags::Normal
@@ -116,7 +120,6 @@ impl Display for Move {
     }
 }
 
-
 // 271 is the maximum number of legal moves in a (possibly not reachable) position, see
 // <https://lichess.org/@/Tobs40/blog/why-a-reachable-position-can-have-at-most-218-playable-moves/a5xdxeqs>
 pub const MAX_MOVES: usize = 271;
@@ -126,11 +129,15 @@ pub type MoveList = ArrayVec<Move, MAX_MOVES>;
 impl Position {
     pub fn is_probably_legal(&self, m: Move) -> bool {
         let src = m.src;
-        let Some(piece) = self.piece_on(src) else { return false };
+        let Some(piece) = self.piece_on(src) else {
+            return false;
+        };
         if piece.color() != self.stm {
             return false;
         }
-        if m.promo_piece().is_some() && (piece.piece_type() != PieceType::Pawn || ![0, 7].contains(&(m.dest.rank() as u8))) {
+        if m.promo_piece().is_some()
+            && (piece.piece_type() != PieceType::Pawn || ![0, 7].contains(&(m.dest.rank() as u8)))
+        {
             return false;
         } else if m.is_castle() {
             let rook = if m.flags == MoveFlags::CastleQueenside {
@@ -139,7 +146,9 @@ impl Position {
                 self.castling[self.stm][1]
             };
             let Some(rook) = rook else { return false };
-            if piece.piece_type() != PieceType::King || self.piece_on(rook) != Some(ColPiece::new(self.stm, PieceType::Rook)) {
+            if piece.piece_type() != PieceType::King
+                || self.piece_on(rook) != Some(ColPiece::new(self.stm, PieceType::Rook))
+            {
                 return false;
             }
             if RAYS_EXCLUSIVE[src][m.dest].intersects(self.occupied_bb() & !rook.bb()) {

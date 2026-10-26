@@ -201,7 +201,7 @@ pub const STANDARD_FENS: &[&str] = &[
     // Triggered a bug in SF once which didn't appear in the usual perft test suite
     "r7/4p3/5p1q/3P4/4pQ2/4pP2/6pp/R3K1kr w Q - 1 3 ;D1 29 ;D2 681 ;D3 18511 ;D4 430036 ;D5 11609488 ;D6 274691896 ;D7 7350003193",
     // very unusual
-    "1R6/1rbP1p2/1Rb5/KRb1P1P1/1RB1p1p1/krB3p1/1rBp1P2/1r6 w - - 0 1 ;D1 36 ;D2 1307 ;D3 42984 ;D4 1585010 ;D5 53468762 ;D6 2011727434"
+    "1R6/1rbP1p2/1Rb5/KRb1P1P1/1RB1p1p1/krB3p1/1rBp1P2/1r6 w - - 0 1 ;D1 36 ;D2 1307 ;D3 42984 ;D4 1585010 ;D5 53468762 ;D6 2011727434",
 ];
 
 /// This perft test suite is also taken from Ethereal: <https://github.com/AndyGrant/Ethereal/blob/master/src/perft/fischer.epd>;
