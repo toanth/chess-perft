@@ -1,4 +1,4 @@
-use crate::movegen::MoveListCallback;
+use crate::movegen::MoveCallback;
 use crate::moves::Move;
 use crate::perft::BulkCounting::{Bulk, NoBulk};
 use crate::pos::Position;
@@ -25,7 +25,7 @@ pub fn perft_impl<const B: BulkCounting>(pos: Position, depth: usize) -> u64 {
         new_pos.make_move(m);
         res += perft_impl::<B>(new_pos, depth - 1);
     };
-    pos.legal_moves_impl(MoveListCallback { f });
+    pos.legal_moves_impl(MoveCallback { f });
     res
 }
 

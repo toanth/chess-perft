@@ -23,11 +23,11 @@ pub trait MoveGenCallback {
     }
 }
 
-pub struct MoveListCallback<F: FnMut(Move)> {
+pub struct MoveCallback<F: FnMut(Move)> {
     pub f: F,
 }
 
-impl<F: FnMut(Move)> MoveGenCallback for MoveListCallback<F> {
+impl<F: FnMut(Move)> MoveGenCallback for MoveCallback<F> {
     fn gen_attacks(&mut self, bb: Bitboard, src: Square, flag: MoveFlags) {
         for dest in bb {
             (self.f)(Move::new(src, dest, flag))
@@ -68,7 +68,7 @@ impl Position {
     pub fn legal_moves(&self) -> MoveList {
         let mut res = MoveList::new();
         let f = |m: Move| res.push(m);
-        let callback = MoveListCallback { f };
+        let callback = MoveCallback { f };
         self.legal_moves_impl(callback);
         res
     }
