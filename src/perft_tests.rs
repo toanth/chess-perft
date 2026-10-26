@@ -12,9 +12,9 @@ use std::time::Instant;
 
 #[test]
 fn simple_test() {
-    let pos = Position::from_fen("    8/7r/8/K1k5/8/8/4p3/8 b - - 10 11").unwrap();
+    let mut pos = Position::from_fen("    8/7r/8/K1k5/8/8/4p3/8 b - - 10 11").unwrap();
     let mov = Move::parse("e2e1q", &pos).unwrap();
-    let pos = pos.make_move(mov);
+    pos.make_move(mov);
     let res = perft(pos, 5, Bulk);
     assert_eq!(res.nodes, 15010);
 }

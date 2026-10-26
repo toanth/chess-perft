@@ -159,7 +159,7 @@ impl Position {
         self.attacks_of(src).has(m.dest)
     }
 
-    pub fn make_move(mut self, m: Move) -> Self {
+    pub fn make_move(&mut self, m: Move) {
         debug_assert!(self.is_probably_legal(m), "{m} {self}");
         let src = m.src;
         let dest = m.dest;
@@ -220,6 +220,5 @@ impl Position {
         } else if Some(dest) == self.castling[!us][1] {
             self.castling[!us][1] = None;
         }
-        self
     }
 }

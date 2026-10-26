@@ -21,7 +21,8 @@ pub fn perft_impl<const B: BulkCounting>(pos: Position, depth: usize) -> u64 {
     }
     let mut res = 0;
     let f = |m: Move| {
-        let new_pos = pos.make_move(m);
+        let mut new_pos = pos;
+        new_pos.make_move(m);
         res += perft_impl::<B>(new_pos, depth - 1);
     };
     pos.legal_moves_impl(MoveListCallback { f });
@@ -54,7 +55,8 @@ pub fn splitperft(pos: Position, depth: usize, bulk: BulkCounting) -> SplitPerft
         let child_nodes = if depth == 1 {
             1
         } else {
-            let child = pos.make_move(m);
+            let mut child = pos;
+            child.make_move(m);
             if bulk == NoBulk {
                 perft_impl::<{ NoBulk }>(child, depth - 1)
             } else {

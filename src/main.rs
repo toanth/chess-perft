@@ -39,7 +39,7 @@ fn parse_pos(mut input: &str) -> Res<Position> {
         if !pos.is_probably_legal(m) {
             return Err(format!("Move '{m}' is not legal in {pos}"));
         }
-        pos = pos.make_move(m);
+        pos.make_move(m);
     }
     Ok(pos)
 }
