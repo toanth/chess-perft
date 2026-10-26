@@ -1,11 +1,12 @@
 use crate::moves::Move;
+use crate::perft::BulkCounting::Bulk;
 use crate::perft::perft;
 use crate::pos::Position;
 use crate::test_positions::{
-    ExpectedPerftRes, CHESS_960_FENS, CUSTOM_FENS, INVALID, STANDARD_FENS,
+    CHESS_960_FENS, CUSTOM_FENS, ExpectedPerftRes, INVALID, STANDARD_FENS,
 };
 use rayon::prelude::*;
-use std::io::{stdout, Write};
+use std::io::{Write, stdout};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 
@@ -14,7 +15,7 @@ fn simple_test() {
     let pos = Position::from_fen("    8/7r/8/K1k5/8/8/4p3/8 b - - 10 11").unwrap();
     let mov = Move::parse("e2e1q", &pos).unwrap();
     let pos = pos.make_move(mov);
-    let res = perft(pos, 5);
+    let res = perft(pos, 5, Bulk);
     assert_eq!(res.nodes, 15010);
 }
 
@@ -23,19 +24,19 @@ fn kiwipete_test() {
     let pos =
         Position::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1")
             .unwrap();
-    let res = perft(pos, 4);
+    let res = perft(pos, 4, Bulk);
     assert_eq!(res.nodes, 4_085_603);
-    // kiwipete after white castles (cheaper to run than increasing the depth of kiwipete, and failed perft once in motors)
+    // kiwipete after white castles (cheaper to run than increasing the depth of kiwipete, and failed perft once in motors), Bulk
     let pos =
         Position::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R4RK1 b kq - 1 1")
             .unwrap();
-    let res = perft(pos, 4);
+    let res = perft(pos, 4, Bulk);
     assert_eq!(res.nodes, 4_119_629);
     // kiwipete after white plays a2a3
     let pos =
         Position::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/P1N2Q1p/1PPBBPPP/R3K2R b KQkq - 0 1")
             .unwrap();
-    let res = perft(pos, 4);
+    let res = perft(pos, 4, Bulk);
     assert_eq!(res.nodes, 4_627_439);
 }
 
@@ -44,15 +45,15 @@ fn leonids_position_test() {
     let pos =
         Position::from_fen("q2k2q1/2nqn2b/1n1P1n1b/2rnr2Q/1NQ1QN1Q/3Q3B/2RQR2B/Q2K2Q1 w - - 0 1")
             .unwrap();
-    let res = perft(pos, 1);
+    let res = perft(pos, 1, Bulk);
     assert_eq!(res.nodes, 99);
     assert!(res.time.as_millis() <= 20);
-    let res = perft(pos, 2);
+    let res = perft(pos, 2, Bulk);
     assert_eq!(res.nodes, 6271);
-    let res = perft(pos, 3);
+    let res = perft(pos, 3, Bulk);
     assert_eq!(res.nodes, 568_299);
     if cfg!(not(debug_assertions)) {
-        let res = perft(pos, 4);
+        let res = perft(pos, 4, Bulk);
         assert_eq!(res.nodes, 34_807_627);
     }
 }
@@ -71,7 +72,7 @@ fn castling_perft_test() {
         53117779,
     ];
     for (depth, &perft_num) in expected.iter().enumerate() {
-        assert_eq!(perft(pos, depth + 1).nodes, perft_num);
+        assert_eq!(perft(pos, depth + 1, Bulk).nodes, perft_num);
     }
 }
 
@@ -79,9 +80,9 @@ fn castling_perft_test() {
 fn no_choice_test() {
     let fen = "5b1k/4p1p1/4P1P1/8/8/1p1p4/1P1P4/K1B5 w - - 0 1";
     let pos = Position::from_fen(fen).unwrap();
-    let res = perft(pos, 500);
+    let res = perft(pos, 500, Bulk);
     assert_eq!(res.nodes, 1);
-    let res = perft(pos, 500);
+    let res = perft(pos, 500, Bulk);
     assert_eq!(res.nodes, 1);
 }
 
@@ -168,7 +169,7 @@ fn perft_enpassant() {
     for (fen, results) in tests {
         let pos = Position::from_fen(fen).unwrap();
         for (idx, &expected) in results.iter().enumerate() {
-            let result = perft(pos, idx);
+            let result = perft(pos, idx, Bulk);
             assert_eq!(result.nodes, expected, "depth {idx}: {fen}");
         }
     }
@@ -184,7 +185,7 @@ fn perft_double_checked() {
     for (fen, results) in tests {
         let pos = Position::from_fen(fen).unwrap();
         for (idx, &expected) in results.iter().enumerate() {
-            let result = perft(pos, idx);
+            let result = perft(pos, idx, Bulk);
             assert_eq!(result.nodes, expected, "depth {idx}: {fen}");
         }
     }
@@ -234,7 +235,7 @@ fn perft_pins() {
     for (fen, results) in tests {
         let pos = Position::from_fen(fen).unwrap();
         for (idx, &expected) in results.iter().enumerate() {
-            let result = perft(pos, idx);
+            let result = perft(pos, idx, Bulk);
             assert_eq!(result.nodes, expected, "depth {idx}: {fen}");
         }
     }
@@ -259,7 +260,7 @@ fn perft_dfrc() {
     for (fen, results) in tests {
         let pos = Position::from_fen(fen).unwrap();
         for (idx, &expected) in results.iter().enumerate() {
-            let result = perft(pos, idx);
+            let result = perft(pos, idx, Bulk);
             assert_eq!(result.nodes, expected, "depth {idx}: {fen}");
         }
     }
@@ -300,7 +301,7 @@ fn custom_perft_test() {
     perft_test(CUSTOM_FENS);
 }
 
-/// Parallelizes the perft testcases so that this takes less time, but the chess960 suite still takes a very long time.
+/// Parallelizes the perft testcases so that this, Bulk takes less time, but the chess960 suite still takes a very long time.
 fn perft_test(fens: &'static [&'static str]) {
     let start_time = Instant::now();
     let solved_tests = AtomicU64::new(0);
@@ -324,7 +325,7 @@ fn perft_test(fens: &'static [&'static str]) {
             .enumerate()
             .filter(|&(_, x)| *x != INVALID)
         {
-            let res = perft(pos, depth);
+            let res = perft(pos, depth, Bulk);
             assert_eq!(res.depth, depth);
             assert_eq!(res.nodes, *expected_count, "{depth} {pos}");
             println!(

@@ -1,30 +1,42 @@
 use crate::movegen::MoveListCallback;
 use crate::moves::Move;
+use crate::perft::BulkCounting::{Bulk, NoBulk};
 use crate::pos::Position;
 use std::fmt;
 use std::fmt::Display;
+use std::marker::ConstParamTy;
 use std::time::{Duration, Instant};
 
-pub fn perft_impl(pos: Position, depth: usize) -> u64 {
-    if depth == 1 {
+#[derive(Debug, Copy, Clone, Eq, PartialEq, ConstParamTy)]
+pub enum BulkCounting {
+    NoBulk,
+    Bulk,
+}
+
+pub fn perft_impl<const B: BulkCounting>(pos: Position, depth: usize) -> u64 {
+    if B == NoBulk && depth == 0 {
+        return 1;
+    } else if B == Bulk && depth == 1 {
         return pos.num_moves() as u64;
     }
     let mut res = 0;
     let f = |m: Move| {
         let new_pos = pos.make_move(m);
-        res += perft_impl(new_pos, depth - 1);
+        res += perft_impl::<B>(new_pos, depth - 1);
     };
     pos.legal_moves_impl(MoveListCallback { f });
     res
 }
 
 #[allow(dead_code)]
-pub fn perft(pos: Position, depth: usize) -> PerftRes {
+pub fn perft(pos: Position, depth: usize, bulk: BulkCounting) -> PerftRes {
     let start = Instant::now();
-    let nodes = if depth == 0 {
+    let nodes = if bulk == NoBulk {
+        perft_impl::<{ NoBulk }>(pos, depth)
+    } else if depth == 0 {
         1
     } else {
-        perft_impl(pos, depth)
+        perft_impl::<{ Bulk }>(pos, depth)
     };
     PerftRes {
         time: start.elapsed(),
@@ -33,7 +45,7 @@ pub fn perft(pos: Position, depth: usize) -> PerftRes {
     }
 }
 
-pub fn splitperft(pos: Position, depth: usize) -> SplitPerftRes {
+pub fn splitperft(pos: Position, depth: usize, bulk: BulkCounting) -> SplitPerftRes {
     assert!(depth > 0);
     let mut children = vec![];
     let mut nodes = 0;
@@ -43,7 +55,11 @@ pub fn splitperft(pos: Position, depth: usize) -> SplitPerftRes {
             1
         } else {
             let child = pos.make_move(m);
-            perft_impl(child, depth - 1)
+            if bulk == NoBulk {
+                perft_impl::<{ NoBulk }>(child, depth - 1)
+            } else {
+                perft_impl::<{ Bulk }>(child, depth - 1)
+            }
         };
         nodes += child_nodes;
         children.push((m, child_nodes));

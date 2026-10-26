@@ -2,9 +2,11 @@
 // (e.g. with `RUSTFLAGS="-C target-cpu=..."`)
 #![feature(alloc_slice_into_array)]
 #![feature(portable_simd)]
+#![feature(adt_const_params)]
 
 use crate::core::Res;
 use crate::moves::Move;
+use crate::perft::BulkCounting::{Bulk, NoBulk};
 use crate::perft::{PerftRes, perft_impl, splitperft};
 use crate::pos::Position;
 use crate::test_positions::{ExpectedPerftRes, STANDARD_FENS};
@@ -43,7 +45,7 @@ fn parse_pos(mut input: &str) -> Res<Position> {
 }
 
 fn handle_input(mut line: &str, pos: &mut Position) -> Res<ControlFlow<()>> {
-    line = line.trim();
+    line = line.trim_ascii();
     if line == "x" || line == "quit" {
         return Ok(Break(()));
     } else if line == "uci" {
@@ -58,23 +60,28 @@ fn handle_input(mut line: &str, pos: &mut Position) -> Res<ControlFlow<()>> {
         println!("{pos}");
         return Ok(Continue(()));
     }
+    let mut bulk = Bulk;
+    let mut parse_bulk = |line: &mut &str| {
+        if let Some(rest) = line.strip_prefix("no_bulk") {
+            bulk = NoBulk;
+            *line = rest.trim_ascii();
+        }
+    };
+    parse_bulk(&mut line);
 
     line = line.strip_prefix("go ").unwrap_or(line);
     line = line.strip_prefix("perft ").unwrap_or(line);
     line = line.strip_prefix("depth ").unwrap_or(line);
 
-    let Some((depth, fen)) = line.split_once(" ") else {
-        let depth = line
-            .parse::<usize>()
-            .map_err(|_| format!("Failed to parse depth '{line}'"))?;
-        println!("{}", splitperft(*pos, depth));
-        return Ok(Continue(()));
-    };
+    let (depth, mut fen) = line.split_once(" ").unwrap_or((line, ""));
     let depth = depth
         .parse::<usize>()
         .map_err(|_| format!("Failed to parse depth '{depth}'"))?;
-    *pos = parse_pos(fen)?;
-    println!("{}", splitperft(*pos, depth));
+    parse_bulk(&mut fen);
+    if !fen.is_empty() {
+        *pos = parse_pos(fen)?;
+    }
+    println!("{}", splitperft(*pos, depth, bulk));
     Ok(Continue(()))
 }
 
@@ -122,7 +129,7 @@ fn benchmark() {
     for (i, r) in expected.iter().enumerate() {
         let depth = r.res.iter().rposition(|&n| n <= MAX_NODES).unwrap();
         let before = Instant::now();
-        let perft_res = perft_impl(Position::from_fen(r.fen).unwrap(), depth);
+        let perft_res = perft_impl::<{ Bulk }>(Position::from_fen(r.fen).unwrap(), depth);
         nodes += perft_res;
         let elapsed = before.elapsed().as_secs_f64();
         nps.push((perft_res as f64 / elapsed / 1_000_000., r.fen));
