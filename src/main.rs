@@ -121,8 +121,8 @@ fn main() {
 
 fn benchmark(bulk: BulkCounting) {
     let max_nodes = match bulk {
-        NoBulk => 10_000_000,
-        Bulk => 50_000_000,
+        NoBulk => 3_000_000,
+        Bulk => 20_000_000,
     };
     let expected = STANDARD_FENS
         .iter()
