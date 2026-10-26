@@ -620,7 +620,8 @@ impl Position {
         F: Fn(Square, Bitboard) -> Bitboard,
     {
         for src in sliders & !pinned {
-            callback.gen_attacks(f(src, blockers) & filter, src, MoveFlags::Normal);
+            let attacks = f(src, blockers) & filter;
+            callback.gen_attacks(attacks, src, MoveFlags::Normal);
         }
         for src in sliders & pinned {
             let attacks = f(src, blockers) & filter & RAYS_INFINITE[king][src];

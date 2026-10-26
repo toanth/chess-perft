@@ -267,7 +267,7 @@ impl FromStr for Square {
 
 impl Square {
     pub fn from_rank_file(rank: Rank, file: File) -> Self {
-        Self::try_from(rank as u8 * 8 + file as u8).unwrap()
+        Self::new(rank as usize * 8 + file as usize)
     }
 
     // try_from isn't const
@@ -295,7 +295,7 @@ impl Square {
     }
 
     pub fn flip(self) -> Square {
-        Self::try_from(self as u8 ^ 0b111_000).unwrap()
+        unsafe { mem::transmute(self as u8 ^ 0b111_000) }
     }
 
     pub const fn file(self) -> File {
@@ -410,7 +410,7 @@ impl Bitboard {
 
     pub fn sq(self) -> Square {
         debug_assert!(self.count_ones() == 1);
-        (self.0.trailing_zeros() as u8).try_into().unwrap()
+        unsafe { mem::transmute(self.0.trailing_zeros() as u8) }
     }
 }
 
