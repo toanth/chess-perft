@@ -396,6 +396,7 @@ pub static RAYS_INFINITE: [[Bitboard; 64]; 64] = {
     res
 };
 
+// a manual SIMD implementation wasn't faster than this
 pub fn all_knight_attacks(knights: Bitboard) -> Bitboard {
     let masks = [
         !Bitboard::A_FILE,

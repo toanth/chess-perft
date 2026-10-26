@@ -1,7 +1,7 @@
 use crate::core::CastlingRight::*;
 use crate::core::Color::*;
 use crate::core::PieceType::*;
-use crate::core::{Bitboard, ColPiece, Color, File, PieceType, Square, NUM_PIECES, NUM_PLAYERS};
+use crate::core::{Bitboard, ColPiece, Color, File, NUM_PIECES, NUM_PLAYERS, PieceType, Square};
 use crate::core::{Rank, Res};
 use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
@@ -79,6 +79,10 @@ impl Position {
         let board = fen.next().ok_or("Empty FEN")?;
         if board == "startpos" {
             return Self::from_fen(Self::STARTPOS);
+        } else if board == "kiwipete" {
+            return Self::from_fen(
+                "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
+            );
         }
         let mut pieces = BoardPieces::default();
         let mut rank = 7;
