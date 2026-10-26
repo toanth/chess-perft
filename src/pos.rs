@@ -39,9 +39,15 @@ impl BoardPieces {
     pub fn remove_piece(&mut self, sq: Square) {
         let piece = unsafe { self.mailbox[sq].unwrap_unchecked() };
         self.mailbox[sq] = None;
-        let bb = !Bitboard::single(sq);
-        self.colors[piece.color()] &= bb;
-        self.pieces[piece.piece_type()] &= bb;
+        let bb = Bitboard::single(sq);
+        self.colors[piece.color()] ^= bb;
+        self.pieces[piece.piece_type()] ^= bb;
+    }
+
+    pub fn will_replace_piece(&mut self, sq: Square, replaced: ColPiece) {
+        let bb = Bitboard::single(sq);
+        self.pieces[replaced.piece_type()] ^= bb;
+        self.colors[replaced.color()] ^= bb;
     }
 
     pub fn move_piece(&mut self, src: Square, dest: Square) {

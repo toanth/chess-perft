@@ -168,8 +168,8 @@ impl Position {
         let ep = self.ep;
         self.stm = !self.stm;
         self.ep = None;
-        if self.piece_on(dest).is_some() {
-            self.pieces.remove_piece(dest);
+        if let Some(captured) = self.piece_on(dest) {
+            self.pieces.will_replace_piece(dest, captured);
         }
         self.pieces.move_piece(src, dest);
         match piece.piece_type() {
@@ -199,7 +199,9 @@ impl Position {
                         MoveFlags::CastleKingside => (rook_dests[1], king_dests[1]),
                         _ => unreachable!(),
                     };
-                    self.pieces.remove_piece(dest);
+                    self.pieces
+                        .will_replace_piece(dest, ColPiece::new(us, PieceType::King));
+                    self.pieces.mailbox[dest] = None;
                     self.pieces.place(rook_dest, PieceType::Rook, us);
                     self.pieces.place(king_dest, PieceType::King, us);
                 }
