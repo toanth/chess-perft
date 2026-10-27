@@ -169,9 +169,9 @@ impl Position {
         self.stm = !self.stm;
         self.ep = None;
         if let Some(captured) = self.piece_on(dest) {
-            self.pieces.will_replace_piece(dest, captured);
+            self.board.will_replace_piece(dest, captured);
         }
-        self.pieces.move_piece(src, dest);
+        self.board.move_piece(src, dest);
         match piece.piece_type() {
             PieceType::Pawn => {
                 if m.is_double_pawn_push() {
@@ -183,11 +183,11 @@ impl Position {
                         };
                     }
                 } else if let Some(promo) = m.promo_piece() {
-                    self.pieces.pieces[piece.piece_type()] ^= dest.bb();
-                    self.pieces.place(dest, promo, piece.color());
+                    self.board.pieces[piece.piece_type()] ^= dest.bb();
+                    self.board.place(dest, promo, piece.color());
                 } else if Some(dest) == ep {
                     let captured = unsafe { dest.add(if us == Color::White { -8 } else { 8 }) };
-                    self.pieces.remove_piece(captured);
+                    self.board.remove_piece(captured);
                 }
             }
             PieceType::King => {
@@ -199,11 +199,11 @@ impl Position {
                         MoveFlags::CastleKingside => (rook_dests[1], king_dests[1]),
                         _ => unreachable!(),
                     };
-                    self.pieces
+                    self.board
                         .will_replace_piece(dest, ColPiece::new(us, PieceType::King));
-                    self.pieces.mailbox[dest] = None;
-                    self.pieces.place(rook_dest, PieceType::Rook, us);
-                    self.pieces.place(king_dest, PieceType::King, us);
+                    self.board.mailbox[dest] = None;
+                    self.board.place(rook_dest, PieceType::Rook, us);
+                    self.board.place(king_dest, PieceType::King, us);
                 }
                 self.castling[us][0] = None;
                 self.castling[us][1] = None;

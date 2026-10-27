@@ -64,7 +64,7 @@ impl BoardPieces {
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[repr(align(64))]
 pub struct Position {
-    pub pieces: BoardPieces,
+    pub board: BoardPieces,
     pub castling: [[Option<Square>; 2]; NUM_PLAYERS],
     // Can be incorrectly set in case the ep pawn is pinned; movegen checks for this
     pub ep: Option<Square>,
@@ -83,18 +83,18 @@ impl Position {
             return Err(format!("FEN '{fen}' contains a non-ASCII character"));
         }
         let mut fen = fen.split_ascii_whitespace();
-        let board = fen.next().ok_or("Empty FEN")?;
-        if board == "startpos" {
+        let board_str = fen.next().ok_or("Empty FEN")?;
+        if board_str == "startpos" {
             return Self::from_fen(Self::STARTPOS);
-        } else if board == "kiwipete" {
+        } else if board_str == "kiwipete" {
             return Self::from_fen(
                 "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
             );
         }
-        let mut pieces = BoardPieces::default();
+        let mut board = BoardPieces::default();
         let mut rank = 7;
         let mut file = 0;
-        for c in board.chars() {
+        for c in board_str.chars() {
             if c == '/' {
                 if file != 8 {
                     return Err(format!(
@@ -113,12 +113,12 @@ impl Position {
                 let sq = Square::try_from(rank * 8 + file)?;
                 let color = if c.is_ascii_uppercase() { White } else { Black };
                 match c.to_ascii_lowercase() {
-                    'p' => pieces.place(sq, Pawn, color),
-                    'n' => pieces.place(sq, Knight, color),
-                    'b' => pieces.place(sq, Bishop, color),
-                    'r' => pieces.place(sq, Rook, color),
-                    'q' => pieces.place(sq, Queen, color),
-                    'k' => pieces.place(sq, King, color),
+                    'p' => board.place(sq, Pawn, color),
+                    'n' => board.place(sq, Knight, color),
+                    'b' => board.place(sq, Bishop, color),
+                    'r' => board.place(sq, Rook, color),
+                    'q' => board.place(sq, Queen, color),
+                    'k' => board.place(sq, King, color),
                     _ => return Err(format!("Invalid character '{c}' in first FEN part")),
                 }
                 file += 1;
@@ -137,13 +137,13 @@ impl Position {
             for c in castling_str.chars() {
                 let color = if c.is_ascii_uppercase() { White } else { Black };
                 let rank = if color == White { Rank::R1 } else { Rank::R8 };
-                let king = (pieces.pieces[King] & pieces.colors[color]).sq();
+                let king = (board.pieces[King] & board.colors[color]).sq();
                 let king_file = king.file() as u8;
                 let rook = ColPiece::new(color, Rook);
                 match c.to_ascii_lowercase() {
                     'q' => {
                         let Some(rook) = (0..king_file)
-                            .find(|i| pieces.mailbox[(i + 8 * rank as u8) as usize] == Some(rook))
+                            .find(|i| board.mailbox[(i + 8 * rank as u8) as usize] == Some(rook))
                         else {
                             return Err(format!("Missing {color} rook to castle with queenside"));
                         };
@@ -153,7 +153,7 @@ impl Position {
                     'k' => {
                         let Some(rook) = (king_file + 1..8)
                             .rev()
-                            .find(|i| pieces.mailbox[(i + 8 * rank as u8) as usize] == Some(rook))
+                            .find(|i| board.mailbox[(i + 8 * rank as u8) as usize] == Some(rook))
                         else {
                             return Err(format!("Missing {color} rook to castle with kingside"));
                         };
@@ -177,7 +177,7 @@ impl Position {
             Some(ep_str.parse()?)
         };
         let res = Self {
-            pieces,
+            board,
             castling,
             ep,
             stm,
@@ -186,11 +186,11 @@ impl Position {
     }
 
     pub fn check_valid(self) -> Res<Self> {
-        if self.pieces.colors[0] & self.pieces.colors[1] != Bitboard(0) {
+        if self.board.colors[0] & self.board.colors[1] != Bitboard(0) {
             return Err("Color bitboards overlap".into());
         }
         let mut acc = Bitboard(0);
-        for bb in self.pieces.pieces {
+        for bb in self.board.pieces {
             if bb.intersects(acc) {
                 return Err("Piece bitboards overlap".into());
             }
@@ -200,7 +200,7 @@ impl Position {
             return Err("Piece bitboards and color bitboards differ".into());
         }
         let mut num_pieces = 0;
-        for (i, piece) in self.pieces.mailbox.iter().enumerate() {
+        for (i, piece) in self.board.mailbox.iter().enumerate() {
             let sq = Square::new(i);
             let Some(piece) = piece else {
                 if self.occupied_bb().has(sq) {
@@ -209,8 +209,8 @@ impl Position {
                 continue;
             };
             num_pieces += 1;
-            if !self.pieces.colors[piece.color()].has(sq)
-                || !self.pieces.pieces[piece.piece_type()].has(sq)
+            if !self.board.colors[piece.color()].has(sq)
+                || !self.board.pieces[piece.piece_type()].has(sq)
             {
                 return Err("Bitboards and mailbox differ".into());
             }
@@ -218,7 +218,7 @@ impl Position {
         if num_pieces != self.occupied_bb().0.count_ones() {
             return Err("Bitboards and mailbox differ".into());
         }
-        if self.pieces.pieces[Pawn].intersects(Bitboard::BACKRANKS) {
+        if self.board.pieces[Pawn].intersects(Bitboard::BACKRANKS) {
             return Err("There is a pawn on a backrank".into());
         }
         for c in Color::iter() {
@@ -249,11 +249,11 @@ impl Position {
     }
 
     pub fn piece_on(&self, sq: Square) -> Option<ColPiece> {
-        self.pieces.mailbox[sq]
+        self.board.mailbox[sq]
     }
 
     pub fn piece_type_on(&self, sq: Square) -> Option<PieceType> {
-        self.pieces.mailbox[sq].map(|p| p.piece_type())
+        self.board.mailbox[sq].map(|p| p.piece_type())
     }
 
     pub fn king_sq(&self, color: Color) -> Square {
@@ -261,19 +261,19 @@ impl Position {
     }
 
     pub fn col_piece_bb(&self, piece: PieceType, color: Color) -> Bitboard {
-        self.pieces.pieces[piece] & self.pieces.colors[color]
+        self.board.pieces[piece] & self.board.colors[color]
     }
 
     pub fn piece_bb(&self, piece: PieceType) -> Bitboard {
-        self.pieces.pieces[piece]
+        self.board.pieces[piece]
     }
 
     pub fn col_bb(&self, color: Color) -> Bitboard {
-        self.pieces.colors[color]
+        self.board.colors[color]
     }
 
     pub fn occupied_bb(&self) -> Bitboard {
-        self.pieces.colors[White] | self.pieces.colors[Black]
+        self.board.colors[White] | self.board.colors[Black]
     }
 
     pub const CASTLE_ROOK_DESTS: [[Square; 2]; NUM_PLAYERS] =

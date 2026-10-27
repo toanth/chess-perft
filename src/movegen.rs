@@ -83,7 +83,7 @@ impl Position {
     pub fn legal_moves_impl<C: MoveGenCallback>(&self, mut callback: C) {
         let us = self.stm;
         let king = self.king_sq(us);
-        let our_pieces = self.pieces.colors[us];
+        let our_pieces = self.board.colors[us];
         let (checkers, pinned) = self.calc_checkers_and_pinned(king, us);
         let relevant_attacks = self.calc_relevant_attacks_for(!us);
         callback.gen_attacks(
@@ -187,7 +187,7 @@ impl Position {
         let us = if WHITE { White } else { Black };
         let king = self.king_sq(us);
         let blockers = self.occupied_bb();
-        let their_pieces = self.pieces.colors[!us];
+        let their_pieces = self.board.colors[!us];
         let quiets = !blockers & check_ray;
         let captures = their_pieces & check_ray;
         let pawns = self.col_piece_bb(Pawn, us);
