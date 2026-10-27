@@ -16,8 +16,11 @@ pub enum BulkCounting {
 pub fn perft_impl<const B: BulkCounting>(pos: Position, depth: usize) -> u64 {
     if B == NoBulk && depth == 0 {
         return 1;
-    } else if B == Bulk && depth == 1 {
-        return pos.num_moves() as u64;
+    } else if B == Bulk {
+        debug_assert!(depth >= 2);
+        if depth == 2 {
+            return pos.num_grandchildren() as u64;
+        }
     }
     let mut res = 0;
     let f = |m: Move| {
@@ -36,6 +39,8 @@ pub fn perft(pos: Position, depth: usize, bulk: BulkCounting) -> PerftRes {
         perft_impl::<{ NoBulk }>(pos, depth)
     } else if depth == 0 {
         1
+    } else if depth == 1 {
+        pos.num_moves() as u64
     } else {
         perft_impl::<{ Bulk }>(pos, depth)
     };
@@ -59,6 +64,8 @@ pub fn splitperft(pos: Position, depth: usize, bulk: BulkCounting) -> SplitPerft
             child.make_move(m);
             if bulk == NoBulk {
                 perft_impl::<{ NoBulk }>(child, depth - 1)
+            } else if depth == 1 {
+                pos.num_moves() as u64
             } else {
                 perft_impl::<{ Bulk }>(child, depth - 1)
             }

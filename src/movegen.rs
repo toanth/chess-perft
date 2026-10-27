@@ -80,6 +80,17 @@ impl Position {
         res
     }
 
+    pub fn num_grandchildren(&self) -> usize {
+        let mut res = 0;
+        let f = |m: Move| {
+            let mut new_pos = *self;
+            new_pos.make_move(m);
+            res += new_pos.num_moves();
+        };
+        self.legal_moves_impl(MoveCallback { f });
+        res
+    }
+
     pub fn legal_moves_impl<C: MoveGenCallback>(&self, mut callback: C) {
         let us = self.stm;
         let king = self.king_sq(us);
@@ -141,21 +152,20 @@ impl Position {
             self.gen_pawns::<false, C>(pinned, check_ray, &mut callback);
         }
         for (i, &side) in self.castling[us].iter().enumerate() {
-            if let Some(rook) = side {
-                let blockers = blockers & !(self.col_piece_bb(King, us) | rook.bb());
-                let king_dest = Self::CASTLE_KING_DESTS[us][i];
-                let rook_dest = Self::CASTLE_ROOK_DESTS[us][i];
-                if !RAYS_INCLUSIVE[king][king_dest].intersects(blockers | relevant_attacks)
-                    && !RAYS_INCLUSIVE[rook][rook_dest].intersects(blockers)
-                    && !pinned.has(rook)
-                {
-                    let flag = if i == 0 {
-                        MoveFlags::CastleQueenside
-                    } else {
-                        MoveFlags::CastleKingside
-                    };
-                    callback.gen_single(king, rook, King, flag);
-                }
+            let Some(rook) = side else { continue };
+            let blockers = blockers & !(self.col_piece_bb(King, us) | rook.bb());
+            let king_dest = Self::CASTLE_KING_DESTS[us][i];
+            let rook_dest = Self::CASTLE_ROOK_DESTS[us][i];
+            if !RAYS_INCLUSIVE[king][king_dest].intersects(blockers | relevant_attacks)
+                && !RAYS_INCLUSIVE[rook][rook_dest].intersects(blockers)
+                && !pinned.has(rook)
+            {
+                let flag = if i == 0 {
+                    MoveFlags::CastleQueenside
+                } else {
+                    MoveFlags::CastleKingside
+                };
+                callback.gen_single(king, rook, King, flag);
             }
         }
     }
