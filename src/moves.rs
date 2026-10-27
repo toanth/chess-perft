@@ -24,12 +24,18 @@ pub enum MoveFlags {
 pub struct Move {
     src: Square,
     dest: Square,
+    piece: PieceType,
     flags: MoveFlags,
 }
 
 impl Move {
-    pub fn new(src: Square, dest: Square, flags: MoveFlags) -> Self {
-        Self { src, dest, flags }
+    pub fn new(src: Square, dest: Square, piece: PieceType, flags: MoveFlags) -> Self {
+        Self {
+            src,
+            dest,
+            piece,
+            flags,
+        }
     }
 
     fn src_sq(self) -> Square {
@@ -72,7 +78,7 @@ impl Move {
         }
         let src = Square::from_str(&s[..2])?;
         let dest = Square::from_str(&s[2..4])?;
-        let Some(piece) = pos.piece_on(src) else {
+        let Some(piece) = pos.board.piece_on(src) else {
             return Err(format!(
                 "No piece on start square {src} of move '{s}' in {pos}"
             ));
@@ -87,6 +93,7 @@ impl Move {
             }
         } else if piece.piece_type() == PieceType::King {
             if pos
+                .board
                 .piece_on(dest)
                 .is_some_and(|p| p.color() == piece.color())
                 || (dest.file() as usize).abs_diff(src.file() as usize) > 1
@@ -106,7 +113,7 @@ impl Move {
         } else {
             MoveFlags::Normal
         };
-        Ok(Move::new(src, dest, flags))
+        Ok(Move::new(src, dest, piece.piece_type(), flags))
     }
 }
 
@@ -129,10 +136,13 @@ pub type MoveList = ArrayVec<Move, MAX_MOVES>;
 impl Position {
     pub fn is_probably_legal(&self, m: Move) -> bool {
         let src = m.src;
-        let Some(piece) = self.piece_on(src) else {
+        let Some(piece) = self.board.piece_on(src) else {
             return false;
         };
         if piece.color() != self.stm {
+            return false;
+        }
+        if piece.piece_type() != m.piece {
             return false;
         }
         if m.promo_piece().is_some()
@@ -147,7 +157,7 @@ impl Position {
             };
             let Some(rook) = rook else { return false };
             if piece.piece_type() != PieceType::King
-                || self.piece_on(rook) != Some(ColPiece::new(self.stm, PieceType::Rook))
+                || self.board.piece_on(rook) != Some(ColPiece::new(self.stm, PieceType::Rook))
             {
                 return false;
             }
@@ -164,15 +174,18 @@ impl Position {
         let src = m.src;
         let dest = m.dest;
         let us = self.stm;
-        let piece = unsafe { self.piece_on(src).unwrap_unchecked() };
+        let piece = m.piece;
         let ep = self.ep;
         self.stm = !self.stm;
         self.ep = None;
-        if let Some(captured) = self.piece_on(dest) {
-            self.board.will_replace_piece(dest, captured);
+        if self.board.colors[!us].has(dest) {
+            for bb in &mut self.board.pieces[..PieceType::King as usize] {
+                *bb &= !dest.bb();
+            }
+            self.board.colors[!us] &= !dest.bb();
         }
-        self.board.move_piece(src, dest);
-        match piece.piece_type() {
+        self.board.move_piece(src, dest, piece, us);
+        match piece {
             PieceType::Pawn => {
                 if m.is_double_pawn_push() {
                     let bb = dest.bb();
@@ -183,11 +196,12 @@ impl Position {
                         };
                     }
                 } else if let Some(promo) = m.promo_piece() {
-                    self.board.pieces[piece.piece_type()] ^= dest.bb();
-                    self.board.place(dest, promo, piece.color());
+                    self.board.pieces[piece] ^= dest.bb();
+                    self.board.place(dest, promo, us);
                 } else if Some(dest) == ep {
                     let captured = unsafe { dest.add(if us == Color::White { -8 } else { 8 }) };
-                    self.board.remove_piece(captured);
+                    self.board.colors[!us] &= !captured.bb();
+                    self.board.pieces[PieceType::Pawn] &= !captured.bb();
                 }
             }
             PieceType::King => {
@@ -199,9 +213,10 @@ impl Position {
                         MoveFlags::CastleKingside => (rook_dests[1], king_dests[1]),
                         _ => unreachable!(),
                     };
-                    self.board
-                        .will_replace_piece(dest, ColPiece::new(us, PieceType::King));
-                    self.board.mailbox[dest] = None;
+                    self.board.pieces[PieceType::King] ^= dest.bb();
+                    self.board.pieces[PieceType::Rook] ^= dest.bb();
+                    debug_assert!(!self.board.colors[us].has(dest));
+                    debug_assert!(self.board.pieces[PieceType::King].count_ones() == 1);
                     self.board.place(rook_dest, PieceType::Rook, us);
                     self.board.place(king_dest, PieceType::King, us);
                 }

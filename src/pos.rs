@@ -5,12 +5,12 @@ use crate::core::{Bitboard, ColPiece, Color, File, NUM_PIECES, NUM_PLAYERS, Piec
 use crate::core::{Rank, Res};
 use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
+use std::mem;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct BoardPieces {
     pub colors: [Bitboard; NUM_PLAYERS],
     pub pieces: [Bitboard; NUM_PIECES],
-    pub mailbox: [Option<ColPiece>; 64],
 }
 
 // can't be derived because 64 is too large
@@ -19,45 +19,37 @@ impl Default for BoardPieces {
         Self {
             colors: [Bitboard(0); NUM_PLAYERS],
             pieces: [Bitboard(0); NUM_PIECES],
-            mailbox: [None; 64],
         }
     }
 }
 
 impl BoardPieces {
     pub fn place(&mut self, sq: Square, piece_type: PieceType, color: Color) {
-        self.place_piece(sq, ColPiece::new(color, piece_type));
+        let bb = sq.bb();
+        self.colors[color] |= bb;
+        self.pieces[piece_type] |= bb;
     }
 
-    pub fn place_piece(&mut self, sq: Square, piece: ColPiece) {
-        self.mailbox[sq] = Some(piece);
-        let bb = Bitboard::single(sq);
-        self.colors[piece.color()] |= bb;
-        self.pieces[piece.piece_type()] |= bb;
+    pub fn move_piece(&mut self, src: Square, dest: Square, piece: PieceType, color: Color) {
+        let bb = src.bb() ^ dest.bb();
+        self.colors[color] ^= bb;
+        self.pieces[piece] ^= bb;
     }
 
-    pub fn remove_piece(&mut self, sq: Square) {
-        let piece = unsafe { self.mailbox[sq].unwrap_unchecked() };
-        self.mailbox[sq] = None;
-        let bb = Bitboard::single(sq);
-        self.colors[piece.color()] ^= bb;
-        self.pieces[piece.piece_type()] ^= bb;
+    pub fn piece_on(&self, sq: Square) -> Option<ColPiece> {
+        let color = if self.colors[0].has(sq) { White } else { Black };
+        self.piece_type_on(sq).map(|p| ColPiece::new(color, p))
     }
 
-    pub fn will_replace_piece(&mut self, sq: Square, replaced: ColPiece) {
-        let bb = Bitboard::single(sq);
-        self.pieces[replaced.piece_type()] ^= bb;
-        self.colors[replaced.color()] ^= bb;
-    }
-
-    pub fn move_piece(&mut self, src: Square, dest: Square) {
-        let piece = self.mailbox[src];
-        self.mailbox[src] = None;
-        self.mailbox[dest] = piece;
-        let piece = unsafe { piece.unwrap_unchecked() };
-        let bb = Bitboard::single(src) ^ Bitboard::single(dest);
-        self.colors[piece.color()] ^= bb;
-        self.pieces[piece.piece_type()] ^= bb;
+    pub fn piece_type_on(&self, sq: Square) -> Option<PieceType> {
+        self.pieces.iter().enumerate().find_map(|(i, piece)| {
+            if piece.has(sq) {
+                let piece_type = unsafe { mem::transmute(i as u8) };
+                Some(piece_type)
+            } else {
+                None
+            }
+        })
     }
 }
 
@@ -138,27 +130,26 @@ impl Position {
                 let color = if c.is_ascii_uppercase() { White } else { Black };
                 let rank = if color == White { Rank::R1 } else { Rank::R8 };
                 let king = (board.pieces[King] & board.colors[color]).sq();
-                let king_file = king.file() as u8;
+                let king_file = king.file() as usize;
                 let rook = ColPiece::new(color, Rook);
                 match c.to_ascii_lowercase() {
                     'q' => {
-                        let Some(rook) = (0..king_file)
-                            .find(|i| board.mailbox[(i + 8 * rank as u8) as usize] == Some(rook))
-                        else {
+                        let Some(rook) = (0..king_file).find(|i| {
+                            board.piece_on(Square::new(i + 8 * rank as usize)) == Some(rook)
+                        }) else {
                             return Err(format!("Missing {color} rook to castle with queenside"));
                         };
                         castling[color][Queenside as usize] =
-                            Some(Square::try_from(rook + 8 * rank as u8)?);
+                            Some(Square::try_from((rook + 8 * rank as usize) as u8)?);
                     }
                     'k' => {
-                        let Some(rook) = (king_file + 1..8)
-                            .rev()
-                            .find(|i| board.mailbox[(i + 8 * rank as u8) as usize] == Some(rook))
-                        else {
+                        let Some(rook) = (king_file + 1..8).rev().find(|i| {
+                            board.piece_on(Square::new(i + 8 * rank as usize)) == Some(rook)
+                        }) else {
                             return Err(format!("Missing {color} rook to castle with kingside"));
                         };
                         castling[color][Kingside as usize] =
-                            Some(Square::try_from(rook + 8 * rank as u8)?);
+                            Some(Square::try_from((rook + 8 * rank as usize) as u8)?);
                     }
                     f @ 'a'..='h' => {
                         let file = File::try_from(f)?;
@@ -199,32 +190,18 @@ impl Position {
         if acc != self.occupied_bb() {
             return Err("Piece bitboards and color bitboards differ".into());
         }
-        let mut num_pieces = 0;
-        for (i, piece) in self.board.mailbox.iter().enumerate() {
-            let sq = Square::new(i);
-            let Some(piece) = piece else {
-                if self.occupied_bb().has(sq) {
-                    return Err("Bitboards and mailbox differ".into());
-                }
-                continue;
-            };
-            num_pieces += 1;
-            if !self.board.colors[piece.color()].has(sq)
-                || !self.board.pieces[piece.piece_type()].has(sq)
-            {
-                return Err("Bitboards and mailbox differ".into());
-            }
-        }
-        if num_pieces != self.occupied_bb().0.count_ones() {
-            return Err("Bitboards and mailbox differ".into());
-        }
         if self.board.pieces[Pawn].intersects(Bitboard::BACKRANKS) {
             return Err("There is a pawn on a backrank".into());
+        }
+        if self.col_piece_bb(King, White).count_ones() != 1
+            || self.col_piece_bb(King, Black).count_ones() != 1
+        {
+            return Err("Both sides must have exactly one king".into());
         }
         for c in Color::iter() {
             for (i, &side) in self.castling[c].iter().enumerate() {
                 if let Some(sq) = side {
-                    if self.piece_on(sq) != Some(ColPiece::new(c, Rook))
+                    if self.board.piece_on(sq) != Some(ColPiece::new(c, Rook))
                         || sq.rank() != Rank::try_from(7 * c as usize).unwrap()
                         || sq.file().cmp(&self.king_sq(c).file())
                             != if i == 0 {
@@ -246,14 +223,6 @@ impl Position {
             return Err("The inactive player is in check".into());
         }
         Ok(self)
-    }
-
-    pub fn piece_on(&self, sq: Square) -> Option<ColPiece> {
-        self.board.mailbox[sq]
-    }
-
-    pub fn piece_type_on(&self, sq: Square) -> Option<PieceType> {
-        self.board.mailbox[sq].map(|p| p.piece_type())
     }
 
     pub fn king_sq(&self, color: Color) -> Square {
@@ -289,7 +258,7 @@ impl Display for Position {
             let mut skip = 0;
             for file in 0..8 {
                 let sq = Square::new(rank * 8 + file);
-                let Some(p) = self.piece_on(sq) else {
+                let Some(p) = self.board.piece_on(sq) else {
                     skip += 1;
                     continue;
                 };

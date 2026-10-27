@@ -5,14 +5,14 @@ use crate::attacks::{
 };
 use crate::core::Color::{Black, White};
 use crate::core::PieceType::*;
-use crate::core::{Bitboard, Color, Rank, Square};
+use crate::core::{Bitboard, Color, PieceType, Rank, Square};
 use crate::moves::MoveFlags::{PromoBishop, PromoKnight, PromoQueen, PromoRook};
 use crate::moves::{Move, MoveFlags, MoveList};
 use crate::pos::Position;
 
 pub trait MoveGenCallback {
-    fn gen_attacks(&mut self, bb: Bitboard, src: Square, flag: MoveFlags);
-    fn gen_single(&mut self, src: Square, dest: Square, flag: MoveFlags);
+    fn gen_attacks(&mut self, bb: Bitboard, src: Square, piece: PieceType, flag: MoveFlags);
+    fn gen_single(&mut self, src: Square, dest: Square, piece: PieceType, flag: MoveFlags);
     unsafe fn gen_pawns(&mut self, dests: Bitboard, offset: i8, flag: MoveFlags);
     unsafe fn gen_promos(&mut self, dests: Bitboard, offset: i8) {
         for flag in [PromoKnight, PromoBishop, PromoRook, PromoQueen] {
@@ -28,20 +28,20 @@ pub struct MoveCallback<F: FnMut(Move)> {
 }
 
 impl<F: FnMut(Move)> MoveGenCallback for MoveCallback<F> {
-    fn gen_attacks(&mut self, bb: Bitboard, src: Square, flag: MoveFlags) {
+    fn gen_attacks(&mut self, bb: Bitboard, src: Square, piece: PieceType, flag: MoveFlags) {
         for dest in bb {
-            (self.f)(Move::new(src, dest, flag))
+            (self.f)(Move::new(src, dest, piece, flag))
         }
     }
 
-    fn gen_single(&mut self, src: Square, dest: Square, flag: MoveFlags) {
-        (self.f)(Move::new(src, dest, flag))
+    fn gen_single(&mut self, src: Square, dest: Square, piece: PieceType, flag: MoveFlags) {
+        (self.f)(Move::new(src, dest, piece, flag))
     }
 
     unsafe fn gen_pawns(&mut self, dests: Bitboard, offset: i8, flag: MoveFlags) {
         for dest in dests {
             let src = unsafe { dest.add(offset) };
-            (self.f)(Move::new(src, dest, flag));
+            (self.f)(Move::new(src, dest, Pawn, flag));
         }
     }
 }
@@ -51,11 +51,11 @@ struct CountMovesCallback<'a> {
 }
 
 impl MoveGenCallback for CountMovesCallback<'_> {
-    fn gen_attacks(&mut self, bb: Bitboard, _src: Square, _flag: MoveFlags) {
+    fn gen_attacks(&mut self, bb: Bitboard, _src: Square, _piece: PieceType, _flag: MoveFlags) {
         *self.ctr += bb.count_ones();
     }
 
-    fn gen_single(&mut self, _src: Square, _dest: Square, _flag: MoveFlags) {
+    fn gen_single(&mut self, _src: Square, _dest: Square, _piece: PieceType, _flag: MoveFlags) {
         *self.ctr += 1;
     }
 
@@ -89,6 +89,7 @@ impl Position {
         callback.gen_attacks(
             KINGS[king] & !our_pieces & !relevant_attacks,
             king,
+            King,
             MoveFlags::Normal,
         );
         let check_ray = match checkers.count_ones() {
@@ -98,7 +99,7 @@ impl Position {
         };
         let filter = check_ray & !our_pieces;
         for knight in self.col_piece_bb(Knight, us) & !pinned {
-            callback.gen_attacks(KNIGHTS[knight] & filter, knight, MoveFlags::Normal);
+            callback.gen_attacks(KNIGHTS[knight] & filter, knight, Knight, MoveFlags::Normal);
         }
         let blockers = self.occupied_bb();
         let bishops = self.col_piece_bb(Bishop, us);
@@ -108,6 +109,7 @@ impl Position {
             blockers,
             filter,
             king,
+            Bishop,
             bishop_attacks,
             &mut callback,
         );
@@ -118,6 +120,7 @@ impl Position {
             blockers,
             filter,
             king,
+            Rook,
             rook_attacks,
             &mut callback,
         );
@@ -128,6 +131,7 @@ impl Position {
             blockers,
             filter,
             king,
+            Queen,
             queen_attacks,
             &mut callback,
         );
@@ -150,7 +154,7 @@ impl Position {
                     } else {
                         MoveFlags::CastleKingside
                     };
-                    callback.gen_single(king, rook, flag);
+                    callback.gen_single(king, rook, King, flag);
                 }
             }
         }
@@ -162,6 +166,7 @@ impl Position {
         blockers: Bitboard,
         filter: Bitboard,
         king: Square,
+        slider: PieceType,
         f: F,
         callback: &mut impl MoveGenCallback,
     ) where
@@ -169,11 +174,11 @@ impl Position {
     {
         for src in sliders & !pinned {
             let attacks = f(src, blockers) & filter;
-            callback.gen_attacks(attacks, src, MoveFlags::Normal);
+            callback.gen_attacks(attacks, src, slider, MoveFlags::Normal);
         }
         for src in sliders & pinned {
             let attacks = f(src, blockers) & filter & RAYS_INFINITE[king][src];
-            callback.gen_attacks(attacks, src, MoveFlags::Normal);
+            callback.gen_attacks(attacks, src, slider, MoveFlags::Normal);
         }
     }
 
@@ -245,7 +250,7 @@ impl Position {
                     if !pinned.intersects(src.bb())
                         || RAYS_INFINITE[self.king_sq(us)][src].intersects(ep.bb())
                     {
-                        callback.gen_single(src, ep, MoveFlags::Normal)
+                        callback.gen_single(src, ep, Pawn, MoveFlags::Normal)
                     }
                 }
             }
@@ -253,7 +258,7 @@ impl Position {
     }
 
     pub fn attacks_of(&self, sq: Square) -> Bitboard {
-        let piece = self.piece_type_on(sq).unwrap();
+        let piece = self.board.piece_type_on(sq).unwrap();
         let us = self.stm;
         let blockers = self.occupied_bb();
         match piece {
