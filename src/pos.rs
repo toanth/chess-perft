@@ -62,6 +62,7 @@ impl BoardPieces {
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[repr(align(64))]
 pub struct Position {
     pub pieces: BoardPieces,
     pub castling: [[Option<Square>; 2]; NUM_PLAYERS],
