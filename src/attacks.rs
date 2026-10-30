@@ -17,6 +17,20 @@ pub const PAWN_CAPTS: [[Bitboard; NUM_SQUARES]; NUM_PLAYERS] = {
     res
 };
 
+const fn kingzone_attakcs(attacks: &[Bitboard; NUM_SQUARES]) -> [Bitboard; NUM_SQUARES] {
+    let mut res = [Bitboard(0); NUM_SQUARES];
+    let mut i = 0;
+    while i < NUM_SQUARES {
+        let mut bb = KINGS[i];
+        while bb.0 != 0 {
+            let sq = bb.pop_lsb();
+            res[i].0 |= attacks[sq as usize].0;
+        }
+        i += 1;
+    }
+    res
+}
+
 const fn calc_king(sq: usize) -> Bitboard {
     let sq = Bitboard(1 << sq);
     let bb = Bitboard(sq.0 | sq.west().0 | sq.east().0);
@@ -32,6 +46,8 @@ pub const KINGS: [Bitboard; NUM_SQUARES] = {
     }
     kings
 };
+
+pub const KING_KINGZONES: [Bitboard; NUM_SQUARES] = kingzone_attakcs(&KINGS);
 
 const fn calc_knight(sq: usize) -> Bitboard {
     let sq = Bitboard(1 << sq);
@@ -54,16 +70,7 @@ pub const KNIGHTS: [Bitboard; NUM_SQUARES] = {
     knights
 };
 
-// Attacks of a rook on an empty board, without the rook's square itself
-pub const ROOKS: [Bitboard; NUM_SQUARES] = {
-    let mut rooks = [Bitboard(0); NUM_SQUARES];
-    let mut i = 0;
-    while i < NUM_SQUARES {
-        rooks[i] = Bitboard((Bitboard::RANK_1.0 << (i / 8 * 8)) ^ (Bitboard::A_FILE.0 << (i % 8)));
-        i += 1;
-    }
-    rooks
-};
+pub const KNIGHT_KINGZONES: [Bitboard; NUM_SQUARES] = kingzone_attakcs(&KNIGHTS);
 
 // Attacks of a bishop on an empty board, without the bishop's square itself
 pub const BISHOPS: [Bitboard; NUM_SQUARES] = {
@@ -75,6 +82,21 @@ pub const BISHOPS: [Bitboard; NUM_SQUARES] = {
     }
     bishops
 };
+
+pub const BISHOP_KINGZONES: [Bitboard; NUM_SQUARES] = kingzone_attakcs(&BISHOPS);
+
+// Attacks of a rook on an empty board, without the rook's square itself
+pub const ROOKS: [Bitboard; NUM_SQUARES] = {
+    let mut rooks = [Bitboard(0); NUM_SQUARES];
+    let mut i = 0;
+    while i < NUM_SQUARES {
+        rooks[i] = Bitboard((Bitboard::RANK_1.0 << (i / 8 * 8)) ^ (Bitboard::A_FILE.0 << (i % 8)));
+        i += 1;
+    }
+    rooks
+};
+
+pub const ROOK_KINGZONES: [Bitboard; NUM_SQUARES] = kingzone_attakcs(&ROOKS);
 
 #[cfg(all(feature = "pext-lookup", target_feature = "bmi2"))]
 pub const RELEVANT_ROOKS: [Bitboard; NUM_SQUARES] = {

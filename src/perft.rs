@@ -64,8 +64,8 @@ pub fn splitperft(pos: Position, depth: usize, bulk: BulkCounting) -> SplitPerft
             child.make_move(m);
             if bulk == NoBulk {
                 perft_impl::<{ NoBulk }>(child, depth - 1)
-            } else if depth == 1 {
-                pos.num_moves() as u64
+            } else if depth == 2 {
+                child.num_moves() as u64
             } else {
                 perft_impl::<{ Bulk }>(child, depth - 1)
             }

@@ -22,10 +22,10 @@ pub enum MoveFlags {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Move {
-    src: Square,
-    dest: Square,
-    piece: PieceType,
-    flags: MoveFlags,
+    pub src: Square,
+    pub dest: Square,
+    pub piece: PieceType,
+    pub flags: MoveFlags,
 }
 
 impl Move {

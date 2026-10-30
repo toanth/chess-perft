@@ -96,9 +96,9 @@ impl Position {
         let king = self.king_sq(us);
         let our_pieces = self.board.colors[us];
         let (checkers, pinned) = self.calc_checkers_and_pinned(king, us);
-        let relevant_attacks = self.calc_relevant_attacks_for(!us);
+        let their_attacks = self.all_attacks_of(!us);
         callback.gen_attacks(
-            KINGS[king] & !our_pieces & !relevant_attacks,
+            KINGS[king] & !our_pieces & !their_attacks,
             king,
             King,
             MoveFlags::Normal,
@@ -156,7 +156,7 @@ impl Position {
             let blockers = blockers & !(self.col_piece_bb(King, us) | rook.bb());
             let king_dest = Self::CASTLE_KING_DESTS[us][i];
             let rook_dest = Self::CASTLE_ROOK_DESTS[us][i];
-            if !RAYS_INCLUSIVE[king][king_dest].intersects(blockers | relevant_attacks)
+            if !RAYS_INCLUSIVE[king][king_dest].intersects(blockers | their_attacks)
                 && !RAYS_INCLUSIVE[rook][rook_dest].intersects(blockers)
                 && !pinned.has(rook)
             {
@@ -267,6 +267,33 @@ impl Position {
         }
     }
 
+    pub fn interfering_with_pawns(&self, color: Color) -> Bitboard {
+        let pawns = self.col_piece_bb(Pawn, color);
+        let blockers = self.occupied_bb();
+        match color {
+            White => {
+                let single = pawns.north();
+                let push_past = single & !blockers;
+                let double = Bitboard::rank(Rank::R4) & push_past.north();
+                single | double | single.west() | single.east()
+            }
+            Black => {
+                let single = pawns.south();
+                let push_past = single & !blockers;
+                let double = Bitboard::rank(Rank::R5) & push_past.south();
+                single | double | single.west() | single.east()
+            }
+        }
+    }
+
+    pub fn pawn_attacks(pawns: Bitboard, color: Color) -> Bitboard {
+        let b = match color {
+            White => pawns.north(),
+            Black => pawns.south(),
+        };
+        b.west() | b.east()
+    }
+
     pub fn attacks_of(&self, sq: Square) -> Bitboard {
         let piece = self.board.piece_type_on(sq).unwrap();
         let us = self.stm;
@@ -287,16 +314,7 @@ impl Position {
         }
     }
 
-    pub fn pawn_attacks(pawns: Bitboard, color: Color) -> Bitboard {
-        let b = match color {
-            White => pawns.north(),
-            Black => pawns.south(),
-        };
-        b.west() | b.east()
-    }
-
-    // This only needs to include attacks that can prevent a king move or pin a piece
-    pub fn calc_relevant_attacks_for(&self, us: Color) -> Bitboard {
+    pub fn all_attacks_of(&self, us: Color) -> Bitboard {
         let mut res = KINGS[self.king_sq(us)];
         res |= Self::pawn_attacks(self.col_piece_bb(Pawn, us), us);
         res |= all_knight_attacks(self.col_piece_bb(Knight, us));

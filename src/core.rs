@@ -402,9 +402,9 @@ impl Bitboard {
         self.0 >> (sq as usize) & 1 != 0
     }
 
-    pub fn pop_lsb(&mut self) -> u8 {
+    pub const fn pop_lsb(&mut self) -> u8 {
         let shift = self.0.trailing_zeros();
-        *self &= Self(self.0.wrapping_sub(1));
+        self.0 &= self.0.wrapping_sub(1);
         shift as u8
     }
 
